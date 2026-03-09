@@ -83,11 +83,20 @@
                 <button class="mode-btn btn-reverse" onclick="startGame('reverse')">
                      看中文选英文
                 </button>
+                <button class="mode-btn btn-daily" onclick="startDailyChallenge()">
+                     📅 每日挑战
+                </button>
+                <button class="mode-btn btn-review" onclick="startSmartReview()">
+                     🧠 智能复习
+                </button>
                 <button class="mode-btn btn-wrong-words" onclick="showWrongNotebook()" id="wrongWordsBtn" style="display:none">
                      错词本 (<span id="wrongWordsCount">0</span>)
                 </button>
                 <button class="mode-btn btn-history" onclick="showHistory()">
                      查看历史得分
+                </button>
+                <button class="mode-btn btn-report" onclick="showReport()">
+                     📘 学习报告
                 </button>
                 <button class="mode-btn btn-leaderboard" onclick="showLeaderboard()">
                      排行榜
@@ -157,6 +166,24 @@
         <div class="history-screen" id="historyScreen">
             <h2 class="history-title">📊 历史得分记录</h2>
             <div class="history-list" id="historyList"></div>
+            <div class="mode-buttons">
+                <button class="mode-btn btn-menu" onclick="showMenu()">
+                    🏠 返回主菜单
+                </button>
+            </div>
+        </div>
+
+        <div class="report-screen" id="reportScreen">
+            <h2 class="history-title">📘 学习报告</h2>
+            <div class="report-grid" id="reportGrid"></div>
+            <div class="report-section">
+                <h3 class="report-section-title">🎯 薄弱词汇</h3>
+                <div class="report-list" id="weakWordsList"></div>
+            </div>
+            <div class="report-section">
+                <h3 class="report-section-title">🏆 模式表现</h3>
+                <div class="report-list" id="modePerformanceList"></div>
+            </div>
             <div class="mode-buttons">
                 <button class="mode-btn btn-menu" onclick="showMenu()">
                     🏠 返回主菜单

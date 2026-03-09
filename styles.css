@@ -574,3 +574,21 @@
         .btn-reverse { background:linear-gradient(45deg,#a18cd1,#fbc2eb); color:white; }
         .btn-wrong-words { background:linear-gradient(45deg,#f5576c,#ff8a5c); color:white; }
         .btn-leaderboard { background:linear-gradient(45deg,#ffd86f,#fc6262); color:white; }
+        .btn-daily { background:linear-gradient(45deg,#f6d365,#fda085); color:white; }
+        .btn-review { background:linear-gradient(45deg,#84fab0,#8fd3f4); color:#333; }
+        .btn-report { background:linear-gradient(45deg,#c3cfe2,#c3eaf7); color:#4a4a7a; }
+        .report-screen { display:none; text-align:center; padding:40px 20px; }
+        .report-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:15px; margin-bottom:30px; }
+        .report-card { background:linear-gradient(135deg,#667eea15,#764ba215); border-radius:18px; padding:20px; text-align:center; }
+        .report-card-title { font-size:16px; color:#764ba2; margin-bottom:10px; font-weight:bold; }
+        .report-card-value { font-size:34px; color:#f5576c; font-weight:bold; margin-bottom:6px; }
+        .report-card-subtitle { font-size:14px; color:#888; }
+        .report-section { margin-bottom:24px; text-align:left; }
+        .report-section-title { font-size:22px; color:#764ba2; margin-bottom:12px; }
+        .report-list { display:flex; flex-direction:column; gap:12px; }
+        .report-item { background:linear-gradient(135deg,#667eea15,#764ba215); border-radius:16px; padding:16px 18px; display:flex; justify-content:space-between; align-items:center; gap:15px; }
+        .report-item-info { text-align:left; }
+        .report-item-label { font-size:18px; color:#333; font-weight:bold; }
+        .report-item-meta { font-size:14px; color:#888; margin-top:4px; }
+        .report-item-value { font-size:22px; color:#f5576c; font-weight:bold; white-space:nowrap; }
+        .report-empty { background:linear-gradient(135deg,#667eea10,#764ba210); border-radius:16px; color:#888; font-size:18px; padding:24px; text-align:center; }
