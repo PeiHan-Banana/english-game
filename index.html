@@ -1585,6 +1585,7 @@ let isAnswered = false;
                 });
                 
                 setTimeout(() => playAudio(), 500);
+                setTimeout(() => playAudio(), 2000);
                 
             } else if (currentMode === 'read') {
                 // 看单词选中文模式
@@ -1620,6 +1621,7 @@ let isAnswered = false;
                 };
                 
                 setTimeout(() => playAudio(), 500);
+                setTimeout(() => playAudio(), 2000);
             } else if (currentMode === 'reverse') {
                 questionText.textContent = question.chinese;
                 var ca=question;var wo=getWrongOptions(question,3);
@@ -1688,8 +1690,7 @@ let isAnswered = false;
             if (currentMode === 'write' && !isCorrect) {
                 feedback.textContent = `哎呀，错啦！正确答案是: ${correctAnswer}`;
             }
-            var cw=gameQuestions[currentQuestionIndex].word;
-            setTimeout(function(){speak(cw);},800);
+            // auto-play removed
             if(!isCorrect){saveWrongWord(gameQuestions[currentQuestionIndex]);}
             else if(window._isWrongMode){removeWrongWord(cw);}
         }
@@ -1792,7 +1793,6 @@ let isAnswered = false;
                         
                         document.getElementById('nextBtn').style.display = 'block';
                         saveWrongWord(gameQuestions[currentQuestionIndex]);
-                        setTimeout(function(){speak(gameQuestions[currentQuestionIndex].word);},600);
                         
                         // 显示正确答案
                         if (currentMode !== 'write') {
