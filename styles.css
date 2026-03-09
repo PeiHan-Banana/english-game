@@ -592,3 +592,16 @@
         .report-item-meta { font-size:14px; color:#888; margin-top:4px; }
         .report-item-value { font-size:22px; color:#f5576c; font-weight:bold; white-space:nowrap; }
         .report-empty { background:linear-gradient(135deg,#667eea10,#764ba210); border-radius:16px; color:#888; font-size:18px; padding:24px; text-align:center; }
+        .report-grid-compact { grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); margin-bottom:0; }
+        .trend-chart { display:flex; align-items:flex-end; gap:12px; min-height:220px; padding:20px 16px 8px; background:linear-gradient(135deg,#667eea10,#764ba210); border-radius:18px; overflow-x:auto; }
+        .trend-bar { min-width:72px; flex:1; display:flex; flex-direction:column; align-items:center; gap:8px; }
+        .trend-bar-track { width:100%; height:140px; display:flex; align-items:flex-end; justify-content:center; background:linear-gradient(180deg,#ffffff,#f8f7ff); border-radius:16px; padding:8px; }
+        .trend-bar-fill { width:100%; border-radius:12px 12px 8px 8px; background:linear-gradient(180deg,#84fab0,#8fd3f4); display:flex; align-items:flex-start; justify-content:center; color:#333; font-size:12px; font-weight:bold; padding-top:8px; min-height:18px; transition:height .3s ease; }
+        .trend-bar-label { font-size:13px; color:#666; font-weight:bold; }
+        .trend-bar-meta { font-size:12px; color:#888; text-align:center; line-height:1.4; }
+        .review-chip { display:inline-flex; align-items:center; justify-content:center; min-width:78px; padding:6px 12px; border-radius:999px; font-size:14px; font-weight:bold; background:#ffffffaa; color:#764ba2; margin:0 auto 10px; }
+        @media (max-width: 600px) {
+            .trend-chart { min-height:190px; gap:10px; padding:16px 12px 8px; }
+            .trend-bar { min-width:60px; }
+            .trend-bar-track { height:120px; }
+        }

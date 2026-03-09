@@ -1,10 +1,10 @@
-﻿const vocabularyDatabase = window.vocabularyDatabase || {};
+const vocabularyDatabase = window.vocabularyDatabase || {};
 
 if (!Object.keys(vocabularyDatabase).length) {
-    console.warn('璇嶅簱鏁版嵁鏈姞杞斤紝娓告垙灏嗘棤娉曟甯稿紑濮?);
+    console.warn('词库数据未加载，游戏将无法正常开始');
 }
 
-// 娓告垙鐘舵€?
+// 游戏状态
 let currentMode = '';
 let currentQuestionIndex = 0;
 let score = 0;
@@ -30,8 +30,7 @@ let pendingAudioTimeouts = [];
 
 const SCREEN_IDS = ['loginScreen', 'menuScreen', 'gameScreen', 'resultScreen', 'historyScreen', 'reportScreen', 'wrongNotebookScreen', 'leaderboardScreen'];
 
-// ========== Firebase 閰嶇疆 ==========
-// 璇锋浛鎹负浣犺嚜宸辩殑 Firebase 閰嶇疆锛堜粠 Firebase Console 鑾峰彇锛?
+// ========== Firebase 配置 ==========
 const firebaseConfig = {
     apiKey: "AIzaSyBsfUvwZFfmant1SNLm0WmX2Ixt9pX2wnk",
     authDomain: "english-game-20e46.firebaseapp.com",
@@ -43,22 +42,24 @@ const firebaseConfig = {
     measurementId: "G-T2JXTBSRDR"
 };
 
-// 鍒濆鍖?Firebase
 function initFirebase() {
     try {
         if (firebaseConfig.apiKey && firebaseConfig.databaseURL) {
-            const app = firebase.initializeApp(firebaseConfig);
+            firebase.initializeApp(firebaseConfig);
             firebaseDB = firebase.database();
             isFirebaseReady = true;
-            if(firebase.analytics){firebase.analytics();console.log('Google Analytics 宸插惎鐢?);}
+            if (firebase.analytics) {
+                firebase.analytics();
+                console.log('Google Analytics 已启用');
+            }
             updateSyncStatus(true);
-            console.log('Firebase 宸茶繛鎺?);
+            console.log('Firebase 已连接');
         } else {
-            console.log('Firebase 鏈厤缃紝浣跨敤鏈湴瀛樺偍');
+            console.log('Firebase 未配置，使用本地存储');
             updateSyncStatus(false);
         }
     } catch (e) {
-        console.log('Firebase 鍒濆鍖栧け璐ワ紝浣跨敤鏈湴瀛樺偍:', e);
+        console.log('Firebase 初始化失败，使用本地存储:', e);
         updateSyncStatus(false);
     }
 }
@@ -67,22 +68,21 @@ function updateSyncStatus(online) {
     const el = document.getElementById('syncStatus');
     if (el) {
         if (online) {
-            el.textContent = ' 浜戠鍚屾宸插紑鍚?;
+            el.textContent = ' 云端同步已开启';
             el.className = 'sync-status online';
         } else {
-            el.textContent = ' 鏈湴瀛樺偍妯″紡';
+            el.textContent = ' 本地存储模式';
             el.className = 'sync-status offline';
         }
     }
 }
 
-// ========== 鐜╁鐧诲綍 ==========
 function loginPlayer() {
     const nameInput = document.getElementById('playerNameInput');
     const name = nameInput.value.trim();
     if (!name) {
         nameInput.style.borderColor = '#f5576c';
-        nameInput.placeholder = '璇疯緭鍏ュ悕瀛楋紒';
+        nameInput.placeholder = '请输入名字！';
         return;
     }
     currentPlayerName = name;
@@ -93,7 +93,6 @@ function loginPlayer() {
     document.getElementById('playerInfo').style.display = 'flex';
     document.getElementById('playerNameDisplay').textContent = ' ' + name;
 
-    // 鍔犺浇璇ョ帺瀹剁殑鏁版嵁
     loadPlayerData(name);
     updateWrongWordsBtn();
     loadCheckinData();
@@ -107,7 +106,6 @@ function switchPlayer() {
     currentPlayerName = '';
 }
 
-// ========== 鏁版嵁瀛樺偍 ==========
 function getStorageKey(type) {
     return 'englishGame_' + currentPlayerName + '_' + type;
 }
@@ -156,7 +154,7 @@ function loadUserSettings() {
             totalQuestions = settings.totalQuestions;
         }
     } catch (e) {
-        console.log('璇诲彇璁剧疆澶辫触锛屼娇鐢ㄩ粯璁よ缃?, e);
+        console.log('读取设置失败，使用默认设置', e);
     }
 }
 
@@ -223,12 +221,12 @@ function getSessionRecordMode() {
 
 function getModeDisplayName(mode) {
     const modeNames = {
-        listen: '鍚煶閫夊崟璇?,
-        read: '鐪嬪崟璇嶉€変腑鏂?,
-        write: '鍚煶鍐欏崟璇?,
-        reverse: '鐪嬩腑鏂囬€夎嫳璇?,
-        daily: '姣忔棩鎸戞垬',
-        review: '鏅鸿兘澶嶄範'
+        listen: '听音选单词',
+        read: '看单词选中文',
+        write: '听音写单词',
+        reverse: '看中文选英文',
+        daily: '每日挑战',
+        review: '智能复习'
     };
     return modeNames[mode] || mode;
 }
@@ -294,6 +292,8 @@ function updateWordStats(question, isCorrect) {
     if (!question || !question.word || !currentPlayerName) return;
     const key = normalizeAnswer(question.word);
     const allStats = getWordStatsData();
+    const now = Date.now();
+    const reviewIntervals = [0.25, 1, 2, 4, 7, 15, 30];
     const entry = allStats[key] || {
         word: question.word,
         chinese: question.chinese,
@@ -303,23 +303,109 @@ function updateWordStats(question, isCorrect) {
         streak: 0,
         maxStreak: 0,
         lastSeen: 0,
-        lastWrong: 0
+        lastWrong: 0,
+        reviewLevel: 0,
+        nextReviewAt: 0,
+        lastResult: ''
     };
+
     entry.word = question.word;
     entry.chinese = question.chinese;
     entry.attempts += 1;
-    entry.lastSeen = Date.now();
+    entry.lastSeen = now;
+    entry.lastResult = isCorrect ? 'correct' : 'wrong';
+
     if (isCorrect) {
         entry.correct += 1;
         entry.streak = (entry.streak || 0) + 1;
         entry.maxStreak = Math.max(entry.maxStreak || 0, entry.streak);
+        entry.reviewLevel = Math.min((entry.reviewLevel || 0) + 1, reviewIntervals.length - 1);
     } else {
         entry.wrong += 1;
         entry.streak = 0;
-        entry.lastWrong = Date.now();
+        entry.lastWrong = now;
+        entry.reviewLevel = 0;
     }
+
+    const hours = reviewIntervals[entry.reviewLevel] * 24;
+    entry.nextReviewAt = now + hours * 60 * 60 * 1000;
+
     allStats[key] = entry;
     saveWordStatsData(allStats);
+}
+
+function getReviewState(stats) {
+    const now = Date.now();
+    const nextReviewAt = stats.nextReviewAt || 0;
+    const attempts = stats.attempts || 0;
+    const correct = stats.correct || 0;
+    const accuracy = attempts ? correct / attempts : 0;
+    const dueInMs = nextReviewAt ? nextReviewAt - now : 0;
+    const isDue = !nextReviewAt || dueInMs <= 0;
+    return {
+        accuracy: accuracy,
+        isDue: isDue,
+        overdueMs: isDue ? Math.abs(Math.min(dueInMs, 0)) : 0,
+        dueInHours: isDue ? 0 : Math.ceil(dueInMs / (60 * 60 * 1000))
+    };
+}
+
+function getReviewOverview(wordStats) {
+    return wordStats.reduce(function(summary, item) {
+        const state = getReviewState(item);
+        const attempts = item.attempts || 0;
+        const correct = item.correct || 0;
+        const accuracy = attempts ? correct / attempts : 0;
+
+        if (attempts === 0 || accuracy < 0.6) {
+            summary.learning += 1;
+        }
+        if (attempts >= 3 && accuracy >= 0.85 && (item.streak || 0) >= 3) {
+            summary.mastered += 1;
+        }
+        if (state.isDue) {
+            summary.dueNow += 1;
+        } else if (state.dueInHours <= 24) {
+            summary.dueSoon += 1;
+        }
+        return summary;
+    }, { dueNow: 0, dueSoon: 0, learning: 0, mastered: 0 });
+}
+
+function buildRecentTrend(history, days) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const buckets = [];
+
+    for (let i = days - 1; i >= 0; i--) {
+        const date = new Date(today);
+        date.setDate(today.getDate() - i);
+        const key = date.toISOString().slice(0, 10);
+        buckets.push({
+            key: key,
+            label: `${date.getMonth() + 1}/${date.getDate()}`,
+            sessions: 0,
+            bestScore: 0,
+            totalScore: 0
+        });
+    }
+
+    history.forEach(function(record) {
+        const timestamp = getRecordTimestamp(record);
+        if (!timestamp) return;
+        const key = new Date(timestamp).toISOString().slice(0, 10);
+        const bucket = buckets.find(function(item) { return item.key === key; });
+        if (!bucket) return;
+        bucket.sessions += 1;
+        bucket.totalScore += record.score || 0;
+        bucket.bestScore = Math.max(bucket.bestScore, record.score || 0);
+    });
+
+    return buckets.map(function(bucket) {
+        return Object.assign(bucket, {
+            avgScore: bucket.sessions ? Math.round(bucket.totalScore / bucket.sessions) : 0
+        });
+    });
 }
 
 function getChallengeSeed(count) {
@@ -364,17 +450,24 @@ function calculateReviewWeight(question, statsMap, wrongWordMap) {
     const attempts = stats.attempts || 0;
     const correct = stats.correct || 0;
     const wrong = stats.wrong || 0;
-    const accuracy = attempts ? correct / attempts : 0.6;
+    const accuracy = attempts ? correct / attempts : 0.55;
+    const reviewState = getReviewState(stats);
     let weight = 1;
-    weight += (wrongWordMap[key] || 0) * 5;
+
+    if (reviewState.isDue) {
+        weight += 6 + Math.min(6, reviewState.overdueMs / (24 * 60 * 60 * 1000));
+    } else {
+        weight += Math.max(0, 2 - reviewState.dueInHours / 12);
+    }
+
+    weight += (wrongWordMap[key] || 0) * 4;
     weight += wrong * 2;
-    weight += attempts ? (1 - accuracy) * 4 : 1.5;
-    if (stats.lastWrong && Date.now() - stats.lastWrong < 7 * 24 * 60 * 60 * 1000) {
-        weight += 2;
+    weight += attempts ? (1 - accuracy) * 5 : 2;
+
+    if ((stats.streak || 0) >= 4 && accuracy >= 0.85 && !reviewState.isDue) {
+        weight *= 0.55;
     }
-    if (stats.lastSeen && Date.now() - stats.lastSeen > 3 * 24 * 60 * 60 * 1000) {
-        weight += 1;
-    }
+
     return weight;
 }
 
@@ -410,7 +503,7 @@ function pickWeightedQuestions(pool, count) {
 function startDailyChallenge() {
     const availableWords = getAllVocabulary();
     if (availableWords.length < 4) {
-        alert('鍙敤鍗曡瘝澶皯锛岃鑷冲皯閫夋嫨涓€涓勾绾э紒');
+        alert('可用单词太少，请至少选择一个年级！');
         return;
     }
     clearPendingAudio();
@@ -428,7 +521,7 @@ function startDailyChallenge() {
 function startSmartReview() {
     const availableWords = getAllVocabulary();
     if (availableWords.length < 4) {
-        alert('鍙敤鍗曡瘝澶皯锛岃鑷冲皯閫夋嫨涓€涓勾绾э紒');
+        alert('可用单词太少，请至少选择一个年级！');
         return;
     }
     clearPendingAudio();
@@ -447,6 +540,8 @@ function showReport() {
     showOnlyScreen('reportScreen');
 
     const reportGrid = document.getElementById('reportGrid');
+    const recentTrendChart = document.getElementById('recentTrendChart');
+    const reviewSummaryGrid = document.getElementById('reviewSummaryGrid');
     const weakWordsList = document.getElementById('weakWordsList');
     const modePerformanceList = document.getElementById('modePerformanceList');
     const wordStats = Object.values(getWordStatsData());
@@ -454,6 +549,7 @@ function showReport() {
     const wrongWords = getWrongWordsData();
     const checkinData = JSON.parse(localStorage.getItem(getStorageKey('checkin')) || '{"dates":[],"streak":0}');
     const dailyData = getDailyChallengeData()[getTodayKey()];
+    const reviewOverview = getReviewOverview(wordStats);
 
     const totalAttempts = wordStats.reduce(function(sum, item) { return sum + (item.attempts || 0); }, 0);
     const totalCorrect = wordStats.reduce(function(sum, item) { return sum + (item.correct || 0); }, 0);
@@ -462,22 +558,51 @@ function showReport() {
     const masteredWords = wordStats.filter(function(item) {
         const attempts = item.attempts || 0;
         const correct = item.correct || 0;
-        return attempts >= 3 && correct / attempts >= 0.8;
+        return attempts >= 3 && correct / attempts >= 0.85 && (item.streak || 0) >= 3;
     }).length;
 
     const cards = [
-        { title: '缁冧範灞€鏁?, value: history.length, subtitle: '绱瀹屾垚鐨勬父鎴忚疆娆? },
-        { title: '绛旈鎬绘暟', value: totalAttempts, subtitle: '鎵€鏈変綔绛旀鏁? },
-        { title: '鎬讳綋姝ｇ‘鐜?, value: accuracy + '%', subtitle: '绱鍑嗙‘鐜? },
-        { title: '鎺屾彙璇嶆暟', value: masteredWords, subtitle: '缁冭繃涓旀纭巼80%' },
-        { title: '杩炵画鎵撳崱', value: checkinData.streak || 0, subtitle: '鍧氭寔澶╂暟' },
-        { title: '浠婃棩鎸戞垬', value: dailyData ? dailyData.bestScore + '鍒? : '鏈紑濮?, subtitle: dailyData ? '浠婃棩鏈€浣虫垚缁? : '蹇幓鎸戞垬涓€娆″惂' },
-        { title: '閿欒瘝鏈?, value: wrongWords.length, subtitle: '寰呭涔犺瘝姹? },
-        { title: '鍘嗗彶鏈€楂樺垎', value: bestScore, subtitle: '鎵€鏈夋ā寮忔渶楂樺垎' }
+        { title: '练习局数', value: history.length, subtitle: '累计完成的游戏轮次' },
+        { title: '答题总数', value: totalAttempts, subtitle: '所有作答次数' },
+        { title: '总体正确率', value: accuracy + '%', subtitle: '累计准确率' },
+        { title: '掌握词数', value: masteredWords, subtitle: '练过且稳定掌握的词' },
+        { title: '连续打卡', value: checkinData.streak || 0, subtitle: '坚持练习天数' },
+        { title: '今日挑战', value: dailyData ? dailyData.bestScore + '分' : '未开始', subtitle: dailyData ? '今日最佳成绩' : '快去挑战一次吧' },
+        { title: '错词本', value: wrongWords.length, subtitle: '待复习词汇' },
+        { title: '历史最高分', value: bestScore, subtitle: '所有模式最高分' }
     ];
 
     reportGrid.innerHTML = cards.map(function(card) {
         return '<div class="report-card">' +
+            '<div class="report-card-title">' + escapeHtml(card.title) + '</div>' +
+            '<div class="report-card-value">' + escapeHtml(card.value) + '</div>' +
+            '<div class="report-card-subtitle">' + escapeHtml(card.subtitle) + '</div>' +
+            '</div>';
+    }).join('');
+
+    const trendData = buildRecentTrend(history, 7);
+    const maxSessions = Math.max.apply(null, trendData.map(function(item) { return item.sessions; }).concat([1]));
+    recentTrendChart.innerHTML = trendData.map(function(item) {
+        const height = item.sessions ? Math.max(18, Math.round(item.sessions / maxSessions * 100)) : 12;
+        const fillText = item.sessions ? item.sessions + '局' : '';
+        return '<div class="trend-bar">' +
+            '<div class="trend-bar-track">' +
+            '<div class="trend-bar-fill" style="height:' + height + '%">' + fillText + '</div>' +
+            '</div>' +
+            '<div class="trend-bar-label">' + escapeHtml(item.label) + '</div>' +
+            '<div class="trend-bar-meta">最佳 ' + item.bestScore + ' 分</div>' +
+            '</div>';
+    }).join('');
+
+    const reviewCards = [
+        { title: '现在该复习', value: reviewOverview.dueNow, subtitle: '优先练这些词', chip: '马上复习' },
+        { title: '24小时内到期', value: reviewOverview.dueSoon, subtitle: '可以提前温习', chip: '即将到期' },
+        { title: '学习中词汇', value: reviewOverview.learning, subtitle: '还不够稳定', chip: '继续巩固' },
+        { title: '已掌握词汇', value: reviewOverview.mastered, subtitle: '保持节奏就好', chip: '掌握中' }
+    ];
+    reviewSummaryGrid.innerHTML = reviewCards.map(function(card) {
+        return '<div class="report-card">' +
+            '<div class="review-chip">' + escapeHtml(card.chip) + '</div>' +
             '<div class="report-card-title">' + escapeHtml(card.title) + '</div>' +
             '<div class="report-card-value">' + escapeHtml(card.value) + '</div>' +
             '<div class="report-card-subtitle">' + escapeHtml(card.subtitle) + '</div>' +
@@ -489,24 +614,26 @@ function showReport() {
         const bAttempts = b.attempts || 0;
         const aRate = aAttempts ? (a.correct || 0) / aAttempts : 0;
         const bRate = bAttempts ? (b.correct || 0) / bAttempts : 0;
-        const aScore = (1 - aRate) * aAttempts;
-        const bScore = (1 - bRate) * bAttempts;
+        const aScore = (1 - aRate) * Math.max(aAttempts, 1);
+        const bScore = (1 - bRate) * Math.max(bAttempts, 1);
         return bScore - aScore || bAttempts - aAttempts;
     }).slice(0, 8);
 
     if (!weakestWords.length) {
-        weakWordsList.innerHTML = '<div class="report-empty">杩樻病鏈夎冻澶熺殑鏁版嵁锛屽厛鍘荤帺鍑犺疆鍚э紒</div>';
+        weakWordsList.innerHTML = '<div class="report-empty">还没有足够的数据，先去玩几轮吧！</div>';
     } else {
         weakWordsList.innerHTML = weakestWords.map(function(item) {
             const attempts = item.attempts || 0;
             const correct = item.correct || 0;
             const rate = attempts ? Math.round(correct / attempts * 100) : 0;
+            const reviewState = getReviewState(item);
+            const reviewText = reviewState.isDue ? '现在适合复习' : '约 ' + reviewState.dueInHours + ' 小时后复习';
             return '<div class="report-item">' +
                 '<div class="report-item-info">' +
                 '<div class="report-item-label">' + escapeHtml(item.word) + '  ' + escapeHtml(item.chinese || '') + '</div>' +
-                '<div class="report-item-meta">浣滅瓟 ' + attempts + ' 娆★紝姝ｇ‘鐜?' + rate + '%</div>' +
+                '<div class="report-item-meta">作答 ' + attempts + ' 次，正确率 ' + rate + '%，' + reviewText + '</div>' +
                 '</div>' +
-                '<div class="report-item-value">閿?' + (item.wrong || 0) + ' 娆?/div>' +
+                '<div class="report-item-value">错 ' + (item.wrong || 0) + ' 次</div>' +
                 '</div>';
         }).join('');
     }
@@ -535,15 +662,15 @@ function showReport() {
     });
 
     if (!modeItems.length) {
-        modePerformanceList.innerHTML = '<div class="report-empty">杩樻病鏈夋ā寮忚〃鐜版暟鎹€?/div>';
+        modePerformanceList.innerHTML = '<div class="report-empty">还没有模式表现数据。</div>';
     } else {
         modePerformanceList.innerHTML = modeItems.map(function(item) {
             return '<div class="report-item">' +
                 '<div class="report-item-info">' +
                 '<div class="report-item-label">' + escapeHtml(getModeDisplayName(item.mode)) + '</div>' +
-                '<div class="report-item-meta">鍏辨寫鎴?' + item.count + ' 娆★紝骞冲潎 ' + item.average + ' 鍒?/div>' +
+                '<div class="report-item-meta">共挑战 ' + item.count + ' 次，平均 ' + item.average + ' 分</div>' +
                 '</div>' +
-                '<div class="report-item-value">鏈€楂?' + item.bestScore + ' 鍒?/div>' +
+                '<div class="report-item-value">最高 ' + item.bestScore + ' 分</div>' +
                 '</div>';
         }).join('');
     }
@@ -704,9 +831,14 @@ function updateGradeSelection(){
     document.getElementById('selectAllGrades').checked=Object.values(selectedGrades).every(function(v){return v;});
     saveUserSettings();
 }
-function setQuestionCount(count){
-    totalQuestions=count;
-    document.querySelectorAll('.count-btn').forEach(function(b){b.classList.remove('selected');if(b.textContent.trim()===count+'棰?)b.classList.add('selected');});
+function setQuestionCount(count) {
+    totalQuestions = count;
+    document.querySelectorAll('.count-btn').forEach(function(button) {
+        button.classList.remove('selected');
+        if (button.textContent.trim() === count + '题') {
+            button.classList.add('selected');
+        }
+    });
     saveUserSettings();
 }
 // ========== Wrong Words ==========
@@ -726,43 +858,98 @@ function updateWrongWordsBtn(){
     var ww=getWrongWordsData();var b=document.getElementById('wrongWordsBtn');var cn=document.getElementById('wrongWordsCount');
     if(b)b.style.display=ww.length>0?'block':'none';if(cn)cn.textContent=ww.length;
 }
-function showWrongNotebook(){
+function showWrongNotebook() {
     showOnlyScreen('wrongNotebookScreen');
-    var ww=getWrongWordsData();var list=document.getElementById('wrongWordsList');
-    if(ww.length===0){list.innerHTML='<div class="no-history">馃帀 澶浜嗭紒娌℃湁閿欒瘝锛?/div>';document.getElementById('practiceWrongBtn').style.display='none';return;}
-    var sortedWords=ww.slice().sort(function(a,b){return (b.count||1)-(a.count||1)||(b.lastWrong||0)-(a.lastWrong||0);});
-    document.getElementById('practiceWrongBtn').style.display='block';
-    list.innerHTML=sortedWords.map(function(w){var safeWord=escapeHtml(w.word);var safeChinese=escapeHtml(w.chinese);return '<div class="wrong-word-item"><div><div class="wrong-word-english">'+safeWord+'</div><div class="wrong-word-chinese">'+safeChinese+'</div></div><div style="display:flex;align-items:center;gap:10px"><span class="wrong-word-count">閿?+(w.count||1)+'娆?/span><button class="wrong-word-play" data-word="'+encodeURIComponent(w.word)+'" onclick="speak(decodeURIComponent(this.dataset.word))">馃攰</button></div></div>';}).join('');
+    var wrongWords = getWrongWordsData();
+    var list = document.getElementById('wrongWordsList');
+    if (wrongWords.length === 0) {
+        list.innerHTML = '<div class="no-history">&#127881; 太棒了！没有错词！</div>';
+        document.getElementById('practiceWrongBtn').style.display = 'none';
+        return;
+    }
+    var sortedWords = wrongWords.slice().sort(function(a, b) {
+        return (b.count || 1) - (a.count || 1) || (b.lastWrong || 0) - (a.lastWrong || 0);
+    });
+    document.getElementById('practiceWrongBtn').style.display = 'block';
+    list.innerHTML = sortedWords.map(function(word) {
+        return '<div class="wrong-word-item">' +
+            '<div><div class="wrong-word-english">' + escapeHtml(word.word) + '</div><div class="wrong-word-chinese">' + escapeHtml(word.chinese) + '</div></div>' +
+            '<div style="display:flex;align-items:center;gap:10px"><span class="wrong-word-count">错 ' + (word.count || 1) + ' 次</span><button class="wrong-word-play" data-word="' + encodeURIComponent(word.word) + '" onclick="speak(decodeURIComponent(this.dataset.word))">&#128264;</button></div>' +
+            '</div>';
+    }).join('');
 }
-function clearWrongWords(){
-    if(confirm('纭畾瑕佹竻绌洪敊璇嶆湰鍚楋紵')){localStorage.removeItem(getStorageKey('wrongWords'));if(isFirebaseReady&&firebaseDB){firebaseDB.ref('players/'+currentPlayerName+'/wrongWords').remove().catch(function(){});}updateWrongWordsBtn();showWrongNotebook();}
+function clearWrongWords() {
+    if (confirm('确定要清空错词本吗？')) {
+        localStorage.removeItem(getStorageKey('wrongWords'));
+        if (isFirebaseReady && firebaseDB) {
+            firebaseDB.ref('players/' + currentPlayerName + '/wrongWords').remove().catch(function() {});
+        }
+        updateWrongWordsBtn();
+        showWrongNotebook();
+    }
 }
-function startWrongWordsGame(){
-    var ww=getWrongWordsData();if(ww.length===0){alert('閿欒瘝鏈负绌猴紒');return;}
-    currentMode='read';currentQuestionIndex=0;score=0;
-    var cnt=Math.min(ww.length,totalQuestions);gameQuestions=shuffleArray(ww).slice(0,cnt);
-    window._origTotal=totalQuestions;window._isWrongMode=true;totalQuestions=cnt;
-    showOnlyScreen('gameScreen');document.getElementById('submitBtn').style.display='none';
+function startWrongWordsGame() {
+    var wrongWords = getWrongWordsData();
+    if (wrongWords.length === 0) {
+        alert('错词本为空！');
+        return;
+    }
+    currentMode = 'read';
+    currentQuestionIndex = 0;
+    score = 0;
+    var count = Math.min(wrongWords.length, totalQuestions);
+    gameQuestions = shuffleArray(wrongWords).slice(0, count);
+    window._origTotal = totalQuestions;
+    window._isWrongMode = true;
+    totalQuestions = count;
+    showOnlyScreen('gameScreen');
+    document.getElementById('submitBtn').style.display = 'none';
     displayQuestion();
 }
 // ========== Leaderboard ==========
-function showLeaderboard(){
+function showLeaderboard() {
     showOnlyScreen('leaderboardScreen');
-    var list=document.getElementById('leaderboardList');list.innerHTML='<div class="no-history">鍔犺浇涓?..</div>';
-    if(isFirebaseReady&&firebaseDB){
-        firebaseDB.ref('players').once('value').then(function(snap){
-            var d=snap.val();if(!d){list.innerHTML='<div class="no-history">鏆傛棤鏁版嵁</div>';return;}
-            var sc=[];Object.keys(d).forEach(function(n){var p=d[n];if(p.history&&Array.isArray(p.history)&&p.history.length){sc.push({name:n,score:Math.max.apply(null,p.history.map(function(h){return h.score||0;}))});}});
-            sc.sort(function(a,b){return b.score-a.score||a.name.localeCompare(b.name,'zh-CN');});var top=sc.slice(0,20);
-            if(top.length===0){list.innerHTML='<div class="no-history">鏆傛棤鎺掕鏁版嵁</div>';return;}
-            var icons=['馃','馃','馃'];
-            list.innerHTML=top.map(function(it,i){var r=i<3?icons[i]:(i+1);return '<div class="leaderboard-item"><span class="leaderboard-rank">'+r+'</span><span class="leaderboard-name">'+escapeHtml(it.name)+'</span><span class="leaderboard-score">'+it.score+' 鍒?/span></div>';}).join('');
-        }).catch(function(){list.innerHTML='<div class="no-history">鍔犺浇澶辫触</div>';});
-    }else{
-        var h=JSON.parse(localStorage.getItem(getStorageKey('history'))||'[]');
-        if(h.length===0){list.innerHTML='<div class="no-history">鏆傛棤鏁版嵁</div>';return;}
-        var best=Math.max.apply(null,h.map(function(x){return x.score||0;}));
-        list.innerHTML='<div class="leaderboard-item"><span class="leaderboard-rank">馃</span><span class="leaderboard-name">'+escapeHtml(currentPlayerName)+'</span><span class="leaderboard-score">'+best+' 鍒?/span></div>';
+    var list = document.getElementById('leaderboardList');
+    list.innerHTML = '<div class="no-history">加载中...</div>';
+    if (isFirebaseReady && firebaseDB) {
+        firebaseDB.ref('players').once('value').then(function(snapshot) {
+            var data = snapshot.val();
+            if (!data) {
+                list.innerHTML = '<div class="no-history">暂无数据</div>';
+                return;
+            }
+            var scores = [];
+            Object.keys(data).forEach(function(name) {
+                var player = data[name];
+                if (player.history && Array.isArray(player.history) && player.history.length) {
+                    scores.push({
+                        name: name,
+                        score: Math.max.apply(null, player.history.map(function(item) { return item.score || 0; }))
+                    });
+                }
+            });
+            scores.sort(function(a, b) { return b.score - a.score || a.name.localeCompare(b.name, 'zh-CN'); });
+            var top = scores.slice(0, 20);
+            if (!top.length) {
+                list.innerHTML = '<div class="no-history">暂无排行数据</div>';
+                return;
+            }
+            var icons = ['&#129351;', '&#129352;', '&#129353;'];
+            list.innerHTML = top.map(function(item, index) {
+                var rank = index < 3 ? icons[index] : (index + 1);
+                return '<div class="leaderboard-item"><span class="leaderboard-rank">' + rank + '</span><span class="leaderboard-name">' + escapeHtml(item.name) + '</span><span class="leaderboard-score">' + item.score + ' 分</span></div>';
+            }).join('');
+        }).catch(function() {
+            list.innerHTML = '<div class="no-history">加载失败</div>';
+        });
+    } else {
+        var history = JSON.parse(localStorage.getItem(getStorageKey('history')) || '[]');
+        if (!history.length) {
+            list.innerHTML = '<div class="no-history">暂无数据</div>';
+            return;
+        }
+        var best = Math.max.apply(null, history.map(function(item) { return item.score || 0; }));
+        list.innerHTML = '<div class="leaderboard-item"><span class="leaderboard-rank">&#129351;</span><span class="leaderboard-name">' + escapeHtml(currentPlayerName) + '</span><span class="leaderboard-score">' + best + ' 分</span></div>';
     }
 }
 // ========== Daily Checkin ==========
@@ -776,8 +963,8 @@ function recordCheckin(){
 }
 function updateCheckinDisplay(s){var el=document.getElementById('streakNum');if(el)el.textContent=s||0;}
 function loadCheckinData(){var cd=JSON.parse(localStorage.getItem(getStorageKey('checkin'))||'{"dates":[],"streak":0}');updateCheckinDisplay(cd.streak);}
-const praiseWords = ['Amazing!', 'Excellent!', 'Great!', 'Good!', '澶浜?', '浣犵湡鍘夊!', '缁х画鍔犳补!'];
-const wrongWords = ['鍝庡憖锛岄敊鍟︼紒', '鍒伆蹇冿紒', '鍐嶆兂鎯筹紒'];
+const praiseWords = ['Amazing!', 'Excellent!', 'Great!', 'Good!', '太棒了！', '你真厉害！', '继续加油！'];
+const wrongWords = ['哎呀，错啦！', '别灰心！', '再想想！'];
 
 // Web Audio API 鍒涘缓闊虫晥 - 绉诲姩绔吋瀹圭増
 let audioContext = null;
@@ -1116,7 +1303,7 @@ function showResult() {
     for (let i = 0; i < starCount && i < 5; i++) {
         const star = document.createElement('span');
         star.className = 'star';
-        star.textContent = '';
+        star.textContent = '\u2B50';
         star.style.animationDelay = `${i * 0.2}s`;
         starsContainer.appendChild(star);
     }
