@@ -583,11 +583,11 @@
 
 
         <div class="login-screen" id="loginScreen">
-            <h2 class="game-title">👋 欢迎来到英语闯关！</h2>
+            <h2 class="game-title"> 欢迎来到英语闯关！</h2>
             <p style="font-size: 20px; color: #764ba2; margin-bottom: 25px;">请输入你的名字</p>
             <input type="text" class="name-input" id="playerNameInput" placeholder="你的名字" maxlength="10">
             <button class="mode-btn btn-listen" onclick="loginPlayer()" style="margin-top: 10px;">
-                🚀 开始游戏
+                 开始游戏
             </button>
         </div>
 
@@ -597,8 +597,10 @@
                 <span class="player-name-display" id="playerNameDisplay"> 玩家</span>
                 <button class="switch-player-btn" onclick="switchPlayer()">切换玩家</button>
             </div>
-            <h2 class="game-title">🎮             <div class="grade-selection" id="gradeSelection">
-                <h3>📚 选择学习范围</h3>
+            <h2 class="game-title"> 选择游戏模式 </h2>
+
+            <div class="grade-selection" id="gradeSelection">
+                <h3> 选择学习范围</h3>
                 <div class="grade-select-all"><label><input type="checkbox" id="selectAllGrades" checked onchange="toggleAllGrades(this.checked)"> 全选/取消</label></div>
                 <div class="grade-grid">
                     <label class="grade-checkbox selected" id="cb_g3s1"><input type="checkbox" checked onchange="updateGradeSelection()"> 三年级上</label>
@@ -611,9 +613,9 @@
                     <label class="grade-checkbox selected" id="cb_g6s2"><input type="checkbox" checked onchange="updateGradeSelection()"> 六年级下</label>
                 </div>
             </div>
-            <div class="checkin-area" id="checkinArea"><span>🔥</span><span class="checkin-streak">连续打卡 <span class="streak-num" id="streakNum">0</span> 天</span><span>🔥</span></div>
+            <div class="checkin-area" id="checkinArea"><span></span><span class="checkin-streak">连续打卡 <span class="streak-num" id="streakNum">0</span> 天</span><span></span></div>
             <div class="question-count-area">
-                <h3>📝 每轮题目数量</h3>
+                <h3> 每轮题目数量</h3>
                 <div class="count-options">
                     <button class="count-btn" onclick="setQuestionCount(5)">5题</button>
                     <button class="count-btn" onclick="setQuestionCount(10)">10题</button>
@@ -621,31 +623,30 @@
                     <button class="count-btn" onclick="setQuestionCount(20)">20题</button>
                 </div>
             </div>
-选择游戏模式 🎮</h2>
             <div class="mode-buttons">
                 <button class="mode-btn btn-listen" onclick="startGame('listen')">
-                    🔊 听音选单词
+                     听音选单词
                 </button>
                 <button class="mode-btn btn-read" onclick="startGame('read')">
-                    📖 看单词选中文
+                     看单词选中文
                 </button>
                 <button class="mode-btn btn-write" onclick="startGame('write')">
-                    ✏️ 听音写单词
+                     听音写单词
                 </button>
                 <button class="mode-btn btn-reverse" onclick="startGame('reverse')">
-                    🔄 看中文选英文
+                     看中文选英文
                 </button>
                 <button class="mode-btn btn-wrong-words" onclick="showWrongNotebook()" id="wrongWordsBtn" style="display:none">
-                    📕 错词本 (<span id="wrongWordsCount">0</span>)
+                     错词本 (<span id="wrongWordsCount">0</span>)
                 </button>
                 <button class="mode-btn btn-history" onclick="showHistory()">
-                    📊 查看历史得分
+                     查看历史得分
                 </button>
                 <button class="mode-btn btn-leaderboard" onclick="showLeaderboard()">
-                    🏆 排行榜
+                     排行榜
                 </button>
                 <button class="mode-btn btn-resume" id="resumeBtn" onclick="resumeGame()" style="display: none;">
-                    ▶️ 继续上次游戏
+                     继续上次游戏
                 </button>
             </div>
             <div class="sync-status" id="syncStatus">本地存储模式</div>
@@ -1118,6 +1119,10 @@
         let gameQuestions = [];
         
         let totalQuestions = 15;
+
+        function getCurrentQuestionCount() {
+            return gameQuestions.length || totalQuestions;
+        }
         let selectedGrades = {
             grade3_semester1:true,grade3_semester2:true,grade4_semester1:true,grade4_semester2:true,
             grade5_semester1:true,grade5_semester2:true,grade6_semester1:true,grade6_semester2:true
@@ -1216,7 +1221,7 @@ let isAnswered = false;
 
         // 保存游戏进度（断点续玩）
         function saveGameProgress() {
-            if (!currentPlayerName || currentQuestionIndex >= totalQuestions) return;
+            if (!currentPlayerName || currentQuestionIndex >= getCurrentQuestionCount()) return;
             const progressData = {
                 mode: currentMode,
                 questionIndex: currentQuestionIndex,
@@ -1273,13 +1278,26 @@ let isAnswered = false;
             }
         }
 
+        function getRecordTimestamp(record) {
+            if (record && typeof record.timestamp === 'number') {
+                return record.timestamp;
+            }
+            const parsed = Date.parse(record && record.date ? record.date : '');
+            return Number.isNaN(parsed) ? 0 : parsed;
+        }
+
+        function formatRecordDate(record) {
+            const timestamp = getRecordTimestamp(record);
+            return timestamp ? new Date(timestamp).toLocaleString('zh-CN') : (record.date || '');
+        }
+
         function mergeHistory(local, cloud) {
             const all = [...local];
             cloud.forEach(item => {
                 const exists = all.some(a => a.date === item.date && a.score === item.score && a.mode === item.mode);
                 if (!exists) all.push(item);
             });
-            all.sort((a, b) => new Date(b.date) - new Date(a.date));
+            all.sort((a, b) => getRecordTimestamp(b) - getRecordTimestamp(a));
             return all.slice(0, 30);
         }
 
@@ -1328,6 +1346,8 @@ let isAnswered = false;
                 document.getElementById('playerNameInput').value = lastPlayer;
             }
             document.getElementById('playerNameInput').addEventListener('keypress',function(e){if(e.key==='Enter')loginPlayer();});
+            updateGradeSelection();
+            setQuestionCount(totalQuestions);
         });
 
 
@@ -1499,21 +1519,39 @@ let isAnswered = false;
             if (allWords.length===0) { Object.values(vocabularyDatabase).forEach(g => { Object.values(g).forEach(s => { allWords=allWords.concat(s); }); }); }
             return allWords;
         }
+        function shuffleArray(items) {
+            const shuffled = [...items];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+            return shuffled;
+        }
 
         // 随机抽取题目
         function getRandomQuestions(count) {
-            const allWords = getAllVocabulary();
-            const shuffled = [...allWords].sort(() => Math.random() - 0.5);
-            return shuffled.slice(0, count);
+            return shuffleArray(getAllVocabulary()).slice(0, count);
         }
 
         // 随机生成干扰项
-        function getWrongOptions(correctWord, count) {
-            const allWords = getAllVocabulary();
-            const wrongOptions = allWords
-                .filter(word => word.word !== correctWord.word && word.chinese !== correctWord.chinese)
-                .sort(() => Math.random() - 0.5)
-                .slice(0, count);
+        function getWrongOptions(correctWord, count, displayField = 'chinese') {
+            const usedValues = new Set([correctWord[displayField]]);
+            const wrongOptions = [];
+
+            for (const word of shuffleArray(getAllVocabulary())) {
+                if (word.word === correctWord.word || word.chinese === correctWord.chinese) {
+                    continue;
+                }
+                if (usedValues.has(word[displayField])) {
+                    continue;
+                }
+                usedValues.add(word[displayField]);
+                wrongOptions.push(word);
+                if (wrongOptions.length >= count) {
+                    break;
+                }
+            }
+
             return wrongOptions;
         }
 
@@ -1548,8 +1586,9 @@ let isAnswered = false;
             document.getElementById('wordInput').value = '';
             
             // 更新进度
-            document.getElementById('progressFill').textContent = `${currentQuestionIndex + 1} / ${totalQuestions}`;
-            document.getElementById('progressFill').style.width = `${((currentQuestionIndex + 1) / totalQuestions) * 100}%`;
+            const questionCount = getCurrentQuestionCount();
+            document.getElementById('progressFill').textContent = `${currentQuestionIndex + 1} / ${questionCount}`;
+            document.getElementById('progressFill').style.width = `${((currentQuestionIndex + 1) / questionCount) * 100}%`;
             
             // 更新分数
             document.getElementById('scoreDisplay').textContent = score;
@@ -1573,7 +1612,7 @@ let isAnswered = false;
                 document.getElementById('submitBtn').style.display = 'none';
                 
                 const correctAnswer = question;
-                const wrongOptions = getWrongOptions(question, 3);
+                const wrongOptions = getWrongOptions(question, 3, 'chinese');
                 const allOptions = [...wrongOptions, correctAnswer].sort(() => Math.random() - 0.5);
                 
                 allOptions.forEach(option => {
@@ -1592,7 +1631,7 @@ let isAnswered = false;
                 questionText.textContent = question.word;
                 
                 const correctAnswer = question;
-                const wrongOptions = getWrongOptions(question, 3);
+                const wrongOptions = getWrongOptions(question, 3, 'chinese');
                 const allOptions = [...wrongOptions, correctAnswer].sort(() => Math.random() - 0.5);
                 
                 allOptions.forEach(option => {
@@ -1624,7 +1663,7 @@ let isAnswered = false;
                 setTimeout(() => playAudio(), 2000);
             } else if (currentMode === 'reverse') {
                 questionText.textContent = question.chinese;
-                var ca=question;var wo=getWrongOptions(question,3);
+                var ca=question;var wo=getWrongOptions(question,3,'word');
                 var ao=wo.concat(ca).sort(function(){return Math.random()-0.5;});
                 ao.forEach(function(opt){var btn=document.createElement('button');btn.className='option-btn';btn.textContent=opt.word;btn.onclick=function(){checkAnswer(opt.word,ca.word,btn);};optionsArea.appendChild(btn);});
                 document.getElementById('submitBtn').style.display='none';
@@ -1691,15 +1730,16 @@ let isAnswered = false;
                 feedback.textContent = `哎呀，错啦！正确答案是: ${correctAnswer}`;
             }
             // auto-play removed
-            if(!isCorrect){saveWrongWord(gameQuestions[currentQuestionIndex]);}
-            else if(window._isWrongMode){removeWrongWord(cw);}
+            const currentWord = gameQuestions[currentQuestionIndex];
+            if(!isCorrect){saveWrongWord(currentWord);}
+            else if(window._isWrongMode){removeWrongWord(currentWord.word);}
         }
 
         // 下一题
         function nextQuestion() {
             currentQuestionIndex++;
             
-            if (currentQuestionIndex >= totalQuestions) {
+            if (currentQuestionIndex >= getCurrentQuestionCount()) {
                 showResult();
             } else {
                 displayQuestion();
@@ -1818,7 +1858,7 @@ let isAnswered = false;
 
         // 页面加载时恢复音频上下文
         document.addEventListener('click', function() {
-            if (audioContext.state === 'suspended') {
+            if (audioContext && audioContext.state === 'suspended') {
                 audioContext.resume();
             }
         }, { once: true });
@@ -1826,10 +1866,12 @@ let isAnswered = false;
         // 历史记录管理
         function saveScore(mode, score) {
             const history = JSON.parse(localStorage.getItem(getStorageKey('history')) || '[]');
+            const timestamp = Date.now();
             const record = {
                 mode: mode,
                 score: score,
-                date: new Date().toLocaleString('zh-CN'),
+                timestamp: timestamp,
+                date: new Date(timestamp).toLocaleString('zh-CN'),
                 player: currentPlayerName
             };
             history.unshift(record);
@@ -1873,7 +1915,7 @@ let isAnswered = false;
                 return '<div class="history-item">' +
                     '<div class="history-item-info">' +
                     '<div class="history-item-mode">' + (modeNames[record.mode] || record.mode) + '</div>' +
-                    '<div class="history-item-date">' + record.date + '</div>' +
+                    '<div class="history-item-date">' + formatRecordDate(record) + '</div>' +
                     '</div>' +
                     '<div class="history-item-score">' + record.score + ' 分</div>' +
                     '</div>';
@@ -1881,7 +1923,7 @@ let isAnswered = false;
         }
 
         function clearHistory() {
-            localStorage.removeItem('englishGameHistory');
+            localStorage.removeItem(getStorageKey('history'));
             showHistory();
         }
     </script>
