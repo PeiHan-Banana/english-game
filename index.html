@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -1219,6 +1219,29 @@ let isAnswered = false;
             return 'englishGame_' + currentPlayerName + '_' + type;
         }
 
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function normalizeAnswer(value) {
+            return String(value ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+        }
+
+        function setAnswerControlsDisabled(disabled) {
+            document.querySelectorAll('.option-btn').forEach(function(btn) {
+                btn.disabled = disabled;
+            });
+            var input = document.getElementById('wordInput');
+            var submitBtn = document.getElementById('submitBtn');
+            if (input) input.disabled = disabled;
+            if (submitBtn) submitBtn.disabled = disabled;
+        }
+
         // 保存游戏进度（断点续玩）
         function saveGameProgress() {
             if (!currentPlayerName || currentQuestionIndex >= getCurrentQuestionCount()) return;
@@ -1227,6 +1250,7 @@ let isAnswered = false;
                 questionIndex: currentQuestionIndex,
                 score: score,
                 questions: gameQuestions,
+                questionCount: getCurrentQuestionCount(),
                 timestamp: Date.now()
             };
 
@@ -1294,7 +1318,14 @@ let isAnswered = false;
         function mergeHistory(local, cloud) {
             const all = [...local];
             cloud.forEach(item => {
-                const exists = all.some(a => a.date === item.date && a.score === item.score && a.mode === item.mode);
+                const itemTimestamp = getRecordTimestamp(item);
+                const exists = all.some(a => {
+                    const currentTimestamp = getRecordTimestamp(a);
+                    if (itemTimestamp && currentTimestamp) {
+                        return currentTimestamp === itemTimestamp;
+                    }
+                    return a.date === item.date && a.score === item.score && a.mode === item.mode;
+                });
                 if (!exists) all.push(item);
             });
             all.sort((a, b) => getRecordTimestamp(b) - getRecordTimestamp(a));
@@ -1310,7 +1341,8 @@ let isAnswered = false;
             currentMode = data.mode;
             currentQuestionIndex = data.questionIndex;
             score = data.score;
-            gameQuestions = data.questions;
+            gameQuestions = Array.isArray(data.questions) ? data.questions : [];
+            totalQuestions = data.questionCount || gameQuestions.length || totalQuestions;
 
             document.getElementById('menuScreen').style.display = 'none';
             document.getElementById('gameScreen').style.display = 'block';
@@ -1333,7 +1365,7 @@ let isAnswered = false;
 
         // 页面关闭前自动保存
         window.addEventListener('beforeunload', function() {
-            if (currentMode && currentQuestionIndex < totalQuestions && currentQuestionIndex > 0) {
+            if (currentMode && currentQuestionIndex < getCurrentQuestionCount() && currentQuestionIndex > 0) {
                 saveGameProgress();
             }
         });
@@ -1378,6 +1410,7 @@ let isAnswered = false;
         function removeWrongWord(w){
             var ww=getWrongWordsData().filter(function(x){return x.word!==w;});
             localStorage.setItem(getStorageKey('wrongWords'),JSON.stringify(ww));updateWrongWordsBtn();
+            if(isFirebaseReady&&firebaseDB){firebaseDB.ref('players/'+currentPlayerName+'/wrongWords').set(ww).catch(function(){});}
         }
         function updateWrongWordsBtn(){
             var ww=getWrongWordsData();var b=document.getElementById('wrongWordsBtn');var cn=document.getElementById('wrongWordsCount');
@@ -1388,15 +1421,15 @@ let isAnswered = false;
             var ww=getWrongWordsData();var list=document.getElementById('wrongWordsList');
             if(ww.length===0){list.innerHTML='<div class="no-history">🎉 太棒了！没有错词！</div>';document.getElementById('practiceWrongBtn').style.display='none';return;}
             document.getElementById('practiceWrongBtn').style.display='block';
-            list.innerHTML=ww.map(function(w){return '<div class="wrong-word-item"><div><div class="wrong-word-english">'+w.word+'</div><div class="wrong-word-chinese">'+w.chinese+'</div></div><div style="display:flex;align-items:center;gap:10px"><span class="wrong-word-count">错'+(w.count||1)+'次</span><button class="wrong-word-play" data-word="'+encodeURIComponent(w.word)+'" onclick="speak(decodeURIComponent(this.dataset.word))">🔊</button></div></div>';}).join('');
+            list.innerHTML=ww.map(function(w){var safeWord=escapeHtml(w.word);var safeChinese=escapeHtml(w.chinese);return '<div class="wrong-word-item"><div><div class="wrong-word-english">'+safeWord+'</div><div class="wrong-word-chinese">'+safeChinese+'</div></div><div style="display:flex;align-items:center;gap:10px"><span class="wrong-word-count">错'+(w.count||1)+'次</span><button class="wrong-word-play" data-word="'+encodeURIComponent(w.word)+'" onclick="speak(decodeURIComponent(this.dataset.word))">🔊</button></div></div>';}).join('');
         }
         function clearWrongWords(){
-            if(confirm('确定要清空错词本吗？')){localStorage.removeItem(getStorageKey('wrongWords'));updateWrongWordsBtn();showWrongNotebook();}
+            if(confirm('确定要清空错词本吗？')){localStorage.removeItem(getStorageKey('wrongWords'));if(isFirebaseReady&&firebaseDB){firebaseDB.ref('players/'+currentPlayerName+'/wrongWords').remove().catch(function(){});}updateWrongWordsBtn();showWrongNotebook();}
         }
         function startWrongWordsGame(){
             var ww=getWrongWordsData();if(ww.length===0){alert('错词本为空！');return;}
             currentMode='read';currentQuestionIndex=0;score=0;
-            var cnt=Math.min(ww.length,totalQuestions);gameQuestions=ww.sort(function(){return Math.random()-0.5;}).slice(0,cnt);
+            var cnt=Math.min(ww.length,totalQuestions);gameQuestions=shuffleArray(ww).slice(0,cnt);
             window._origTotal=totalQuestions;window._isWrongMode=true;totalQuestions=cnt;
             document.getElementById('menuScreen').style.display='none';document.getElementById('wrongNotebookScreen').style.display='none';
             document.getElementById('gameScreen').style.display='block';document.getElementById('resultScreen').style.display='none';
@@ -1410,17 +1443,17 @@ let isAnswered = false;
             if(isFirebaseReady&&firebaseDB){
                 firebaseDB.ref('players').once('value').then(function(snap){
                     var d=snap.val();if(!d){list.innerHTML='<div class="no-history">暂无数据</div>';return;}
-                    var sc=[];Object.keys(d).forEach(function(n){var p=d[n];if(p.history&&Array.isArray(p.history)){sc.push({name:n,score:Math.max.apply(null,p.history.map(function(h){return h.score||0;}))});}});
-                    sc.sort(function(a,b){return b.score-a.score;});var top=sc.slice(0,20);
+                    var sc=[];Object.keys(d).forEach(function(n){var p=d[n];if(p.history&&Array.isArray(p.history)&&p.history.length){sc.push({name:n,score:Math.max.apply(null,p.history.map(function(h){return h.score||0;}))});}});
+                    sc.sort(function(a,b){return b.score-a.score||a.name.localeCompare(b.name,'zh-CN');});var top=sc.slice(0,20);
                     if(top.length===0){list.innerHTML='<div class="no-history">暂无排行数据</div>';return;}
                     var icons=['🥇','🥈','🥉'];
-                    list.innerHTML=top.map(function(it,i){var r=i<3?icons[i]:(i+1);return '<div class="leaderboard-item"><span class="leaderboard-rank">'+r+'</span><span class="leaderboard-name">'+it.name+'</span><span class="leaderboard-score">'+it.score+' 分</span></div>';}).join('');
+                    list.innerHTML=top.map(function(it,i){var r=i<3?icons[i]:(i+1);return '<div class="leaderboard-item"><span class="leaderboard-rank">'+r+'</span><span class="leaderboard-name">'+escapeHtml(it.name)+'</span><span class="leaderboard-score">'+it.score+' 分</span></div>';}).join('');
                 }).catch(function(){list.innerHTML='<div class="no-history">加载失败</div>';});
             }else{
                 var h=JSON.parse(localStorage.getItem(getStorageKey('history'))||'[]');
                 if(h.length===0){list.innerHTML='<div class="no-history">暂无数据</div>';return;}
                 var best=Math.max.apply(null,h.map(function(x){return x.score||0;}));
-                list.innerHTML='<div class="leaderboard-item"><span class="leaderboard-rank">🥇</span><span class="leaderboard-name">'+currentPlayerName+'</span><span class="leaderboard-score">'+best+' 分</span></div>';
+                list.innerHTML='<div class="leaderboard-item"><span class="leaderboard-rank">🥇</span><span class="leaderboard-name">'+escapeHtml(currentPlayerName)+'</span><span class="leaderboard-score">'+best+' 分</span></div>';
             }
         }
         // ========== Daily Checkin ==========
@@ -1584,6 +1617,7 @@ let isAnswered = false;
             document.getElementById('feedback').className = 'feedback';
             document.getElementById('nextBtn').style.display = 'none';
             document.getElementById('wordInput').value = '';
+            setAnswerControlsDisabled(false);
             
             // 更新进度
             const questionCount = getCurrentQuestionCount();
@@ -1613,7 +1647,7 @@ let isAnswered = false;
                 
                 const correctAnswer = question;
                 const wrongOptions = getWrongOptions(question, 3, 'chinese');
-                const allOptions = [...wrongOptions, correctAnswer].sort(() => Math.random() - 0.5);
+                const allOptions = shuffleArray([...wrongOptions, correctAnswer]);
                 
                 allOptions.forEach(option => {
                     const btn = document.createElement('button');
@@ -1632,7 +1666,7 @@ let isAnswered = false;
                 
                 const correctAnswer = question;
                 const wrongOptions = getWrongOptions(question, 3, 'chinese');
-                const allOptions = [...wrongOptions, correctAnswer].sort(() => Math.random() - 0.5);
+                const allOptions = shuffleArray([...wrongOptions, correctAnswer]);
                 
                 allOptions.forEach(option => {
                     const btn = document.createElement('button');
@@ -1664,7 +1698,7 @@ let isAnswered = false;
             } else if (currentMode === 'reverse') {
                 questionText.textContent = question.chinese;
                 var ca=question;var wo=getWrongOptions(question,3,'word');
-                var ao=wo.concat(ca).sort(function(){return Math.random()-0.5;});
+                var ao=shuffleArray(wo.concat(ca));
                 ao.forEach(function(opt){var btn=document.createElement('button');btn.className='option-btn';btn.textContent=opt.word;btn.onclick=function(){checkAnswer(opt.word,ca.word,btn);};optionsArea.appendChild(btn);});
                 document.getElementById('submitBtn').style.display='none';
             }
@@ -1673,15 +1707,16 @@ let isAnswered = false;
         // 播放发音
         function playAudio() {
             const question = gameQuestions[currentQuestionIndex];
+            if (!question) return;
             speak(question.word);
         }
 
         // 提交答案（听音写单词模式）
         function submitAnswer() {
             if (isAnswered) return;
-            const userAnswer = document.getElementById('wordInput').value.trim().toLowerCase();
+            const userAnswer = normalizeAnswer(document.getElementById('wordInput').value);
             const question = gameQuestions[currentQuestionIndex];
-            checkAnswer(userAnswer, question.word.toLowerCase(), null);
+            checkAnswer(userAnswer, normalizeAnswer(question.word), null);
         }
 
         // 检查答案
@@ -1693,8 +1728,9 @@ let isAnswered = false;
             
             const feedback = document.getElementById('feedback');
             feedback.style.display = 'block';
+            setAnswerControlsDisabled(true);
             
-            const isCorrect = userAnswer === correctAnswer;
+            const isCorrect = normalizeAnswer(userAnswer) === normalizeAnswer(correctAnswer);
             
             if (isCorrect) {
                 score += 10;
@@ -1822,6 +1858,7 @@ let isAnswered = false;
                         isAnswered = true;
                         const feedback = document.getElementById('feedback');
                         feedback.style.display = 'block';
+                        setAnswerControlsDisabled(true);
                         feedback.textContent = '时间到！';
                         feedback.classList.add('wrong');
                         playWrongSound();
@@ -1911,13 +1948,14 @@ let isAnswered = false;
                 'reverse': '看中文选英语'
             };
 
-            historyList.innerHTML = history.map((record, index) => {
+            const sortedHistory = [...history].sort((a, b) => getRecordTimestamp(b) - getRecordTimestamp(a));
+            historyList.innerHTML = sortedHistory.map((record) => {
                 return '<div class="history-item">' +
                     '<div class="history-item-info">' +
-                    '<div class="history-item-mode">' + (modeNames[record.mode] || record.mode) + '</div>' +
-                    '<div class="history-item-date">' + formatRecordDate(record) + '</div>' +
+                    '<div class="history-item-mode">' + escapeHtml(modeNames[record.mode] || record.mode) + '</div>' +
+                    '<div class="history-item-date">' + escapeHtml(formatRecordDate(record)) + '</div>' +
                     '</div>' +
-                    '<div class="history-item-score">' + record.score + ' 分</div>' +
+                    '<div class="history-item-score">' + (record.score || 0) + ' 分</div>' +
                     '</div>';
             }).join('');
         }
@@ -1929,4 +1967,5 @@ let isAnswered = false;
     </script>
 </body>
 </html>
+
 
