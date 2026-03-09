@@ -632,15 +632,23 @@
                 <button class="mode-btn btn-write" onclick="startGame('write')">
                     ✏️ 听音写单词
                 </button>
+                <button class="mode-btn btn-reverse" onclick="startGame('reverse')">
+                    🔄 看中文选英文
+                </button>
+                <button class="mode-btn btn-wrong-words" onclick="showWrongNotebook()" id="wrongWordsBtn" style="display:none">
+                    📕 错词本 (<span id="wrongWordsCount">0</span>)
+                </button>
                 <button class="mode-btn btn-history" onclick="showHistory()">
                     📊 查看历史得分
+                </button>
+                <button class="mode-btn btn-leaderboard" onclick="showLeaderboard()">
+                    🏆 排行榜
                 </button>
                 <button class="mode-btn btn-resume" id="resumeBtn" onclick="resumeGame()" style="display: none;">
                     ▶️ 继续上次游戏
                 </button>
             </div>
-            <div class="sync-status" id="syncStatus">             <div class="mode-buttons" style="margin-top:10px"><button class="mode-btn btn-leaderboard" onclick="showLeaderboard()">🏆 排行榜</button></div>
-本地存储模式</div>
+            <div class="sync-status" id="syncStatus">本地存储模式</div>
         </div>
 
         <div class="game-screen" id="gameScreen">
@@ -707,10 +715,7 @@
                 </button>
             </div>
         </div>
-    </div>
 
-
-    
         <div class="wrong-notebook-screen" id="wrongNotebookScreen">
             <h2 class="history-title">📕 我的错词本</h2>
             <div id="wrongWordsList" class="history-list"></div>
@@ -727,13 +732,13 @@
                 <button class="mode-btn btn-menu" onclick="showMenu()">🏠 返回主菜单</button>
             </div>
         </div>
-
     </div>
 
 
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics-compat.js"></script>
 
     <script>
         // 完整词汇题库 - 人教版PEP教材三年级至六年级
@@ -1143,6 +1148,7 @@ let isAnswered = false;
                     const app = firebase.initializeApp(firebaseConfig);
                     firebaseDB = firebase.database();
                     isFirebaseReady = true;
+                    if(firebase.analytics){firebase.analytics();console.log('Google Analytics 已启用');}
                     updateSyncStatus(true);
                     console.log('Firebase 已连接');
                 } else {
