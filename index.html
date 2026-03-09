@@ -454,6 +454,79 @@
                 font-size: 20px;
             }
         }
+
+        .login-screen {
+            text-align: center;
+            padding: 40px 20px;
+        }
+
+        .name-input {
+            padding: 20px 30px;
+            font-size: 28px;
+            border: 3px solid #e0e0e0;
+            border-radius: 15px;
+            width: 80%;
+            max-width: 350px;
+            font-family: 'Comic Sans MS', 'Microsoft YaHei', cursive;
+            text-align: center;
+            display: block;
+            margin: 0 auto 20px;
+        }
+
+        .name-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .player-info {
+            text-align: center;
+            margin-bottom: 15px;
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #667eea15, #764ba215);
+            border-radius: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .player-name-display {
+            font-size: 22px;
+            color: #764ba2;
+            font-weight: bold;
+        }
+
+        .switch-player-btn {
+            padding: 8px 20px;
+            font-size: 14px;
+            background: linear-gradient(45deg, #f093fb, #f5576c);
+            color: white;
+            border: none;
+            border-radius: 15px;
+            cursor: pointer;
+            font-family: 'Comic Sans MS', 'Microsoft YaHei', cursive;
+            font-weight: bold;
+        }
+
+        .btn-resume {
+            background: linear-gradient(45deg, #ffd86f, #fc6262);
+            color: white;
+        }
+
+        .sync-status {
+            text-align: center;
+            font-size: 14px;
+            color: #888;
+            margin-top: 10px;
+        }
+
+        .sync-status.online {
+            color: #43e97b;
+        }
+
+        .sync-status.offline {
+            color: #f5576c;
+        }
+
     </style>
 </head>
 <body>
@@ -477,7 +550,22 @@
             <p class="credit">By Rainbow</p>
         </div>
 
-        <div class="menu-screen" id="menuScreen">
+
+        <div class="login-screen" id="loginScreen">
+            <h2 class="game-title"> 欢迎来到英语闯关！</h2>
+            <p style="font-size: 20px; color: #764ba2; margin-bottom: 25px;">请输入你的名字</p>
+            <input type="text" class="name-input" id="playerNameInput" placeholder="你的名字" maxlength="10">
+            <button class="mode-btn btn-listen" onclick="loginPlayer()" style="margin-top: 10px;">
+                 开始游戏
+            </button>
+        </div>
+
+        <div class="menu-screen" id="menuScreen" style="display: none;">
+
+            <div class="player-info" id="playerInfo" style="display: none;">
+                <span class="player-name-display" id="playerNameDisplay"> 玩家</span>
+                <button class="switch-player-btn" onclick="switchPlayer()">切换玩家</button>
+            </div>
             <h2 class="game-title">🎮 选择游戏模式 🎮</h2>
             <div class="mode-buttons">
                 <button class="mode-btn btn-listen" onclick="startGame('listen')">
@@ -492,7 +580,11 @@
                 <button class="mode-btn btn-history" onclick="showHistory()">
                     📊 查看历史得分
                 </button>
+                <button class="mode-btn btn-resume" id="resumeBtn" onclick="resumeGame()" style="display: none;">
+                     继续上次游戏
+                </button>
             </div>
+            <div class="sync-status" id="syncStatus"> 本地存储模式</div>
         </div>
 
         <div class="game-screen" id="gameScreen">
@@ -560,6 +652,11 @@
             </div>
         </div>
     </div>
+
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 
     <script>
         // 完整词汇题库 - 人教版PEP教材三年级至六年级
@@ -939,6 +1036,205 @@
         let gameQuestions = [];
         let isAnswered = false;
 
+        let currentPlayerName = '';
+        let firebaseDB = null;
+        let isFirebaseReady = false;
+
+        // ========== Firebase 配置 ==========
+        // 请替换为你自己的 Firebase 配置（从 Firebase Console 获取）
+        const firebaseConfig = {
+            apiKey: "",
+            authDomain: "",
+            databaseURL: "",
+            projectId: "",
+            storageBucket: "",
+            messagingSenderId: "",
+            appId: ""
+        };
+
+        // 初始化 Firebase
+        function initFirebase() {
+            try {
+                if (firebaseConfig.apiKey && firebaseConfig.databaseURL) {
+                    const app = firebase.initializeApp(firebaseConfig);
+                    firebaseDB = firebase.database();
+                    isFirebaseReady = true;
+                    updateSyncStatus(true);
+                    console.log('Firebase 已连接');
+                } else {
+                    console.log('Firebase 未配置，使用本地存储');
+                    updateSyncStatus(false);
+                }
+            } catch (e) {
+                console.log('Firebase 初始化失败，使用本地存储:', e);
+                updateSyncStatus(false);
+            }
+        }
+
+        function updateSyncStatus(online) {
+            const el = document.getElementById('syncStatus');
+            if (el) {
+                if (online) {
+                    el.textContent = ' 云端同步已开启';
+                    el.className = 'sync-status online';
+                } else {
+                    el.textContent = ' 本地存储模式';
+                    el.className = 'sync-status offline';
+                }
+            }
+        }
+
+        // ========== 玩家登录 ==========
+        function loginPlayer() {
+            const nameInput = document.getElementById('playerNameInput');
+            const name = nameInput.value.trim();
+            if (!name) {
+                nameInput.style.borderColor = '#f5576c';
+                nameInput.placeholder = '请输入名字！';
+                return;
+            }
+            currentPlayerName = name;
+            localStorage.setItem('englishGameLastPlayer', name);
+
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('menuScreen').style.display = 'block';
+            document.getElementById('playerInfo').style.display = 'flex';
+            document.getElementById('playerNameDisplay').textContent = ' ' + name;
+
+            // 加载该玩家的数据
+            loadPlayerData(name);
+        }
+
+        function switchPlayer() {
+            clearInterval(timerInterval);
+            document.getElementById('menuScreen').style.display = 'none';
+            document.getElementById('gameScreen').style.display = 'none';
+            document.getElementById('resultScreen').style.display = 'none';
+            document.getElementById('historyScreen').style.display = 'none';
+            document.getElementById('loginScreen').style.display = 'block';
+            document.getElementById('resumeBtn').style.display = 'none';
+            currentPlayerName = '';
+        }
+
+        // ========== 数据存储 ==========
+        function getStorageKey(type) {
+            return 'englishGame_' + currentPlayerName + '_' + type;
+        }
+
+        // 保存游戏进度（断点续玩）
+        function saveGameProgress() {
+            if (!currentPlayerName || currentQuestionIndex >= 15) return;
+            const progressData = {
+                mode: currentMode,
+                questionIndex: currentQuestionIndex,
+                score: score,
+                questions: gameQuestions,
+                timestamp: Date.now()
+            };
+
+            // 保存到 localStorage
+            localStorage.setItem(getStorageKey('progress'), JSON.stringify(progressData));
+
+            // 保存到 Firebase
+            if (isFirebaseReady && firebaseDB) {
+                firebaseDB.ref('players/' + currentPlayerName + '/progress').set(progressData)
+                    .catch(err => console.log('Firebase保存进度失败:', err));
+            }
+        }
+
+        // 加载玩家数据
+        function loadPlayerData(playerName) {
+            // 先从 localStorage 加载
+            const localProgress = localStorage.getItem(getStorageKey('progress'));
+            if (localProgress) {
+                const data = JSON.parse(localProgress);
+                // 检查进度是否有效（24小时内）
+                if (Date.now() - data.timestamp < 24 * 60 * 60 * 1000) {
+                    document.getElementById('resumeBtn').style.display = 'block';
+                }
+            }
+
+            // 如果 Firebase 可用，从云端加载
+            if (isFirebaseReady && firebaseDB) {
+                firebaseDB.ref('players/' + playerName).once('value')
+                    .then(snapshot => {
+                        const data = snapshot.val();
+                        if (data) {
+                            // 同步历史记录
+                            if (data.history) {
+                                const localHistory = JSON.parse(localStorage.getItem(getStorageKey('history')) || '[]');
+                                // 合并云端和本地记录（去重）
+                                const merged = mergeHistory(localHistory, data.history);
+                                localStorage.setItem(getStorageKey('history'), JSON.stringify(merged));
+                            }
+                            // 同步游戏进度
+                            if (data.progress && Date.now() - data.progress.timestamp < 24 * 60 * 60 * 1000) {
+                                localStorage.setItem(getStorageKey('progress'), JSON.stringify(data.progress));
+                                document.getElementById('resumeBtn').style.display = 'block';
+                            }
+                        }
+                    })
+                    .catch(err => console.log('Firebase加载失败:', err));
+            }
+        }
+
+        function mergeHistory(local, cloud) {
+            const all = [...local];
+            cloud.forEach(item => {
+                const exists = all.some(a => a.date === item.date && a.score === item.score && a.mode === item.mode);
+                if (!exists) all.push(item);
+            });
+            all.sort((a, b) => new Date(b.date) - new Date(a.date));
+            return all.slice(0, 30);
+        }
+
+        // 继续上次游戏
+        function resumeGame() {
+            const savedProgress = localStorage.getItem(getStorageKey('progress'));
+            if (!savedProgress) return;
+
+            const data = JSON.parse(savedProgress);
+            currentMode = data.mode;
+            currentQuestionIndex = data.questionIndex;
+            score = data.score;
+            gameQuestions = data.questions;
+
+            document.getElementById('menuScreen').style.display = 'none';
+            document.getElementById('gameScreen').style.display = 'block';
+            document.getElementById('resultScreen').style.display = 'none';
+            document.getElementById('historyScreen').style.display = 'none';
+            document.getElementById('submitBtn').style.display = 'none';
+
+            displayQuestion();
+        }
+
+        // 清除已保存的进度
+        function clearSavedProgress() {
+            localStorage.removeItem(getStorageKey('progress'));
+            document.getElementById('resumeBtn').style.display = 'none';
+            if (isFirebaseReady && firebaseDB) {
+                firebaseDB.ref('players/' + currentPlayerName + '/progress').remove()
+                    .catch(err => console.log('Firebase清除进度失败:', err));
+            }
+        }
+
+        // 页面关闭前自动保存
+        window.addEventListener('beforeunload', function() {
+            if (currentMode && currentQuestionIndex < 15 && currentQuestionIndex > 0) {
+                saveGameProgress();
+            }
+        });
+
+        // 页面加载时自动登录上次玩家
+        window.addEventListener('DOMContentLoaded', function() {
+            initFirebase();
+            const lastPlayer = localStorage.getItem('englishGameLastPlayer');
+            if (lastPlayer) {
+                document.getElementById('playerNameInput').value = lastPlayer;
+            }
+        });
+
+
         // 激励语
         const praiseWords = ['Amazing!', 'Excellent!', 'Great!', 'Good!', '太棒了!', '你真厉害!', '继续加油!'];
         const wrongWords = ['哎呀，错啦！', '别灰心！', '再想想！'];
@@ -1053,6 +1349,7 @@
             document.getElementById('historyScreen').style.display = 'none';
             document.getElementById('submitBtn').style.display = 'none';
             
+            clearSavedProgress();
             displayQuestion();
         }
 
@@ -1212,6 +1509,7 @@
                 showResult();
             } else {
                 displayQuestion();
+                saveGameProgress();
             }
         }
 
@@ -1327,18 +1625,27 @@
 
         // 历史记录管理
         function saveScore(mode, score) {
-            const history = JSON.parse(localStorage.getItem('englishGameHistory') || '[]');
+            const history = JSON.parse(localStorage.getItem(getStorageKey('history')) || '[]');
             const record = {
                 mode: mode,
                 score: score,
-                date: new Date().toLocaleString('zh-CN')
+                date: new Date().toLocaleString('zh-CN'),
+                player: currentPlayerName
             };
             history.unshift(record);
-            // 只保留最近20条记录
-            if (history.length > 20) {
+            if (history.length > 30) {
                 history.pop();
             }
-            localStorage.setItem('englishGameHistory', JSON.stringify(history));
+            localStorage.setItem(getStorageKey('history'), JSON.stringify(history));
+
+            // 同步到 Firebase
+            if (isFirebaseReady && firebaseDB) {
+                firebaseDB.ref('players/' + currentPlayerName + '/history').set(history)
+                    .catch(err => console.log('Firebase保存历史失败:', err));
+            }
+
+            // 清除游戏进度
+            clearSavedProgress();
         }
 
         function showHistory() {
@@ -1346,30 +1653,30 @@
             document.getElementById('gameScreen').style.display = 'none';
             document.getElementById('resultScreen').style.display = 'none';
             document.getElementById('historyScreen').style.display = 'block';
-            
-            const history = JSON.parse(localStorage.getItem('englishGameHistory') || '[]');
+
+            const history = JSON.parse(localStorage.getItem(getStorageKey('history')) || '[]');
             const historyList = document.getElementById('historyList');
-            
+
             if (history.length === 0) {
                 historyList.innerHTML = '<div class="no-history">暂无游戏记录，快去玩游戏吧！</div>';
                 return;
             }
-            
+
             const modeNames = {
                 'listen': '听音选单词',
                 'read': '看单词选中文',
                 'write': '听音写单词'
             };
-            
-            historyList.innerHTML = history.map((record, index) => `
-                <div class="history-item">
-                    <div class="history-item-info">
-                        <div class="history-item-mode">${modeNames[record.mode] || record.mode}</div>
-                        <div class="history-item-date">${record.date}</div>
-                    </div>
-                    <div class="history-item-score">${record.score} 分</div>
-                </div>
-            `).join('');
+
+            historyList.innerHTML = history.map((record, index) => {
+                return '<div class="history-item">' +
+                    '<div class="history-item-info">' +
+                    '<div class="history-item-mode">' + (modeNames[record.mode] || record.mode) + '</div>' +
+                    '<div class="history-item-date">' + record.date + '</div>' +
+                    '</div>' +
+                    '<div class="history-item-score">' + record.score + ' 分</div>' +
+                    '</div>';
+            }).join('');
         }
 
         function clearHistory() {
