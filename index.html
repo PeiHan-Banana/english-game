@@ -943,53 +943,73 @@
         const praiseWords = ['Amazing!', 'Excellent!', 'Great!', 'Good!', '太棒了!', '你真厉害!', '继续加油!'];
         const wrongWords = ['哎呀，错啦！', '别灰心！', '再想想！'];
 
-        // Web Audio API 创建音效
-        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        // Web Audio API 创建音效 - 移动端兼容版
+        let audioContext = null;
+
+        function initAudioContext() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+        }
+
+        document.addEventListener('click', initAudioContext);
+        document.addEventListener('touchstart', initAudioContext);
 
         function playSuccessSound() {
+            initAudioContext();
             const oscillator = audioContext.createOscillator();
             const gainNode = audioContext.createGain();
-            
             oscillator.connect(gainNode);
             gainNode.connect(audioContext.destination);
-            
-            oscillator.frequency.setValueAtTime(523.25, audioContext.currentTime); // C5
-            oscillator.frequency.setValueAtTime(659.25, audioContext.currentTime + 0.1); // E5
-            oscillator.frequency.setValueAtTime(783.99, audioContext.currentTime + 0.2); // G5
-            
+            oscillator.frequency.setValueAtTime(523.25, audioContext.currentTime);
+            oscillator.frequency.setValueAtTime(659.25, audioContext.currentTime + 0.1);
+            oscillator.frequency.setValueAtTime(783.99, audioContext.currentTime + 0.2);
             gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
             gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
-            
             oscillator.start(audioContext.currentTime);
             oscillator.stop(audioContext.currentTime + 0.4);
         }
 
         function playWrongSound() {
+            initAudioContext();
             const oscillator = audioContext.createOscillator();
             const gainNode = audioContext.createGain();
-            
             oscillator.connect(gainNode);
             gainNode.connect(audioContext.destination);
-            
-            oscillator.frequency.setValueAtTime(261.63, audioContext.currentTime); // C4
-            oscillator.frequency.setValueAtTime(220.00, audioContext.currentTime + 0.15); // A3
-            
+            oscillator.frequency.setValueAtTime(261.63, audioContext.currentTime);
+            oscillator.frequency.setValueAtTime(220.00, audioContext.currentTime + 0.15);
             gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
             gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
-            
             oscillator.start(audioContext.currentTime);
             oscillator.stop(audioContext.currentTime + 0.3);
         }
 
-        // 语音合成
+        // 语音合成 - 移动端兼容版
         function speak(text) {
             if ('speechSynthesis' in window) {
                 window.speechSynthesis.cancel();
-                const utterance = new SpeechSynthesisUtterance(text);
-                utterance.lang = 'en-US';
-                utterance.rate = 0.8;
-                window.speechSynthesis.speak(utterance);
+                const trySpeak = () => {
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    utterance.lang = 'en-US';
+                    utterance.rate = 0.8;
+                    const voices = window.speechSynthesis.getVoices();
+                    const englishVoice = voices.find(v => v.lang.startsWith('en'));
+                    if (englishVoice) utterance.voice = englishVoice;
+                    window.speechSynthesis.speak(utterance);
+                };
+                if (window.speechSynthesis.getVoices().length === 0) {
+                    window.speechSynthesis.addEventListener('voiceschanged', trySpeak, { once: true });
+                    setTimeout(trySpeak, 100);
+                } else {
+                    trySpeak();
+                }
+                return;
             }
+            const audio = new Audio('https://dict.youdao.com/dictvoice?audio=' + encodeURIComponent(text) + '&type=2');
+            audio.play().catch(err => console.log('备选音频失败:', err));
         }
 
         // 合并所有词汇
