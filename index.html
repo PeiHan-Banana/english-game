@@ -527,6 +527,37 @@
             color: #f5576c;
         }
 
+
+        .grade-selection { text-align:center; padding:15px; margin-bottom:15px; }
+        .grade-selection h3 { font-size:20px; color:#764ba2; margin-bottom:12px; }
+        .grade-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; max-width:500px; margin:0 auto 12px; }
+        .grade-checkbox { display:flex; align-items:center; justify-content:center; padding:10px 12px; background:linear-gradient(135deg,#667eea15,#764ba215); border-radius:12px; cursor:pointer; transition:all 0.3s; border:2px solid transparent; font-size:15px; color:#333; }
+        .grade-checkbox.selected { border-color:#667eea; background:linear-gradient(135deg,#667eea30,#764ba230); font-weight:bold; }
+        .grade-checkbox input { margin-right:8px; transform:scale(1.3); }
+        .grade-select-all { margin-bottom:8px; }
+        .grade-select-all label { font-size:15px; color:#764ba2; cursor:pointer; }
+        .question-count-area { text-align:center; margin-bottom:15px; }
+        .question-count-area h3 { font-size:17px; color:#764ba2; margin-bottom:8px; }
+        .count-options { display:flex; justify-content:center; gap:10px; flex-wrap:wrap; }
+        .count-btn { padding:8px 20px; font-size:17px; border:2px solid #e0e0e0; border-radius:15px; background:white; cursor:pointer; transition:all 0.3s; font-family:'Comic Sans MS','Microsoft YaHei',cursive; font-weight:bold; color:#333; }
+        .count-btn.selected { border-color:#667eea; background:linear-gradient(45deg,#667eea,#764ba2); color:white; }
+        .wrong-notebook-screen { display:none; text-align:center; padding:40px 20px; }
+        .wrong-word-item { background:linear-gradient(135deg,#f5576c15,#f093fb15); padding:15px 20px; border-radius:15px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center; text-align:left; }
+        .wrong-word-english { font-size:22px; color:#333; font-weight:bold; }
+        .wrong-word-chinese { font-size:18px; color:#764ba2; }
+        .wrong-word-count { font-size:14px; color:#f5576c; background:#f5576c20; padding:4px 10px; border-radius:10px; }
+        .wrong-word-play { padding:8px 15px; font-size:16px; background:linear-gradient(45deg,#667eea,#764ba2); color:white; border:none; border-radius:10px; cursor:pointer; }
+        .leaderboard-screen { display:none; text-align:center; padding:40px 20px; }
+        .leaderboard-item { background:linear-gradient(135deg,#ffd86f15,#fc626215); padding:15px 20px; border-radius:15px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center; }
+        .leaderboard-rank { font-size:28px; min-width:40px; }
+        .leaderboard-name { font-size:20px; color:#333; font-weight:bold; flex:1; text-align:left; margin-left:15px; }
+        .leaderboard-score { font-size:24px; color:#f5576c; font-weight:bold; }
+        .checkin-area { text-align:center; margin-bottom:12px; padding:10px 20px; background:linear-gradient(135deg,#43e97b15,#38f9d715); border-radius:15px; }
+        .checkin-streak { font-size:17px; color:#333; }
+        .checkin-streak .streak-num { color:#f5576c; font-weight:bold; font-size:22px; }
+        .btn-reverse { background:linear-gradient(45deg,#a18cd1,#fbc2eb); color:white; }
+        .btn-wrong-words { background:linear-gradient(45deg,#f5576c,#ff8a5c); color:white; }
+        .btn-leaderboard { background:linear-gradient(45deg,#ffd86f,#fc6262); color:white; }
     </style>
 </head>
 <body>
@@ -552,11 +583,11 @@
 
 
         <div class="login-screen" id="loginScreen">
-            <h2 class="game-title"> 欢迎来到英语闯关！</h2>
+            <h2 class="game-title">👋 欢迎来到英语闯关！</h2>
             <p style="font-size: 20px; color: #764ba2; margin-bottom: 25px;">请输入你的名字</p>
             <input type="text" class="name-input" id="playerNameInput" placeholder="你的名字" maxlength="10">
             <button class="mode-btn btn-listen" onclick="loginPlayer()" style="margin-top: 10px;">
-                 开始游戏
+                🚀 开始游戏
             </button>
         </div>
 
@@ -566,7 +597,31 @@
                 <span class="player-name-display" id="playerNameDisplay"> 玩家</span>
                 <button class="switch-player-btn" onclick="switchPlayer()">切换玩家</button>
             </div>
-            <h2 class="game-title">🎮 选择游戏模式 🎮</h2>
+            <h2 class="game-title">🎮             <div class="grade-selection" id="gradeSelection">
+                <h3>📚 选择学习范围</h3>
+                <div class="grade-select-all"><label><input type="checkbox" id="selectAllGrades" checked onchange="toggleAllGrades(this.checked)"> 全选/取消</label></div>
+                <div class="grade-grid">
+                    <label class="grade-checkbox selected" id="cb_g3s1"><input type="checkbox" checked onchange="updateGradeSelection()"> 三年级上</label>
+                    <label class="grade-checkbox selected" id="cb_g3s2"><input type="checkbox" checked onchange="updateGradeSelection()"> 三年级下</label>
+                    <label class="grade-checkbox selected" id="cb_g4s1"><input type="checkbox" checked onchange="updateGradeSelection()"> 四年级上</label>
+                    <label class="grade-checkbox selected" id="cb_g4s2"><input type="checkbox" checked onchange="updateGradeSelection()"> 四年级下</label>
+                    <label class="grade-checkbox selected" id="cb_g5s1"><input type="checkbox" checked onchange="updateGradeSelection()"> 五年级上</label>
+                    <label class="grade-checkbox selected" id="cb_g5s2"><input type="checkbox" checked onchange="updateGradeSelection()"> 五年级下</label>
+                    <label class="grade-checkbox selected" id="cb_g6s1"><input type="checkbox" checked onchange="updateGradeSelection()"> 六年级上</label>
+                    <label class="grade-checkbox selected" id="cb_g6s2"><input type="checkbox" checked onchange="updateGradeSelection()"> 六年级下</label>
+                </div>
+            </div>
+            <div class="checkin-area" id="checkinArea"><span>🔥</span><span class="checkin-streak">连续打卡 <span class="streak-num" id="streakNum">0</span> 天</span><span>🔥</span></div>
+            <div class="question-count-area">
+                <h3>📝 每轮题目数量</h3>
+                <div class="count-options">
+                    <button class="count-btn" onclick="setQuestionCount(5)">5题</button>
+                    <button class="count-btn" onclick="setQuestionCount(10)">10题</button>
+                    <button class="count-btn selected" onclick="setQuestionCount(15)">15题</button>
+                    <button class="count-btn" onclick="setQuestionCount(20)">20题</button>
+                </div>
+            </div>
+选择游戏模式 🎮</h2>
             <div class="mode-buttons">
                 <button class="mode-btn btn-listen" onclick="startGame('listen')">
                     🔊 听音选单词
@@ -581,10 +636,11 @@
                     📊 查看历史得分
                 </button>
                 <button class="mode-btn btn-resume" id="resumeBtn" onclick="resumeGame()" style="display: none;">
-                     继续上次游戏
+                    ▶️ 继续上次游戏
                 </button>
             </div>
-            <div class="sync-status" id="syncStatus"> 本地存储模式</div>
+            <div class="sync-status" id="syncStatus">             <div class="mode-buttons" style="margin-top:10px"><button class="mode-btn btn-leaderboard" onclick="showLeaderboard()">🏆 排行榜</button></div>
+本地存储模式</div>
         </div>
 
         <div class="game-screen" id="gameScreen">
@@ -651,6 +707,27 @@
                 </button>
             </div>
         </div>
+    </div>
+
+
+    
+        <div class="wrong-notebook-screen" id="wrongNotebookScreen">
+            <h2 class="history-title">📕 我的错词本</h2>
+            <div id="wrongWordsList" class="history-list"></div>
+            <div class="mode-buttons">
+                <button class="mode-btn btn-wrong-words" id="practiceWrongBtn" onclick="startWrongWordsGame()" style="display:none">🔄 练习这些错词</button>
+                <button class="mode-btn btn-menu" onclick="clearWrongWords()">🗑️ 清空错词本</button>
+                <button class="mode-btn btn-menu" onclick="showMenu()">🏠 返回主菜单</button>
+            </div>
+        </div>
+        <div class="leaderboard-screen" id="leaderboardScreen">
+            <h2 class="history-title">🏆 排行榜</h2>
+            <div id="leaderboardList" class="history-list"></div>
+            <div class="mode-buttons">
+                <button class="mode-btn btn-menu" onclick="showMenu()">🏠 返回主菜单</button>
+            </div>
+        </div>
+
     </div>
 
 
@@ -1034,7 +1111,13 @@
         let timer = 15;
         let timerInterval = null;
         let gameQuestions = [];
-        let isAnswered = false;
+        
+        let totalQuestions = 15;
+        let selectedGrades = {
+            grade3_semester1:true,grade3_semester2:true,grade4_semester1:true,grade4_semester2:true,
+            grade5_semester1:true,grade5_semester2:true,grade6_semester1:true,grade6_semester2:true
+        };
+let isAnswered = false;
 
         let currentPlayerName = '';
         let firebaseDB = null;
@@ -1104,6 +1187,7 @@
 
             // 加载该玩家的数据
             loadPlayerData(name);
+            updateWrongWordsBtn();loadCheckinData();
         }
 
         function switchPlayer() {
@@ -1112,6 +1196,8 @@
             document.getElementById('gameScreen').style.display = 'none';
             document.getElementById('resultScreen').style.display = 'none';
             document.getElementById('historyScreen').style.display = 'none';
+            if(document.getElementById('wrongNotebookScreen'))document.getElementById('wrongNotebookScreen').style.display='none';
+            if(document.getElementById('leaderboardScreen'))document.getElementById('leaderboardScreen').style.display='none';
             document.getElementById('loginScreen').style.display = 'block';
             document.getElementById('resumeBtn').style.display = 'none';
             currentPlayerName = '';
@@ -1124,7 +1210,7 @@
 
         // 保存游戏进度（断点续玩）
         function saveGameProgress() {
-            if (!currentPlayerName || currentQuestionIndex >= 15) return;
+            if (!currentPlayerName || currentQuestionIndex >= totalQuestions) return;
             const progressData = {
                 mode: currentMode,
                 questionIndex: currentQuestionIndex,
@@ -1173,6 +1259,8 @@
                                 localStorage.setItem(getStorageKey('progress'), JSON.stringify(data.progress));
                                 document.getElementById('resumeBtn').style.display = 'block';
                             }
+                            if(data.wrongWords){var lw=JSON.parse(localStorage.getItem(getStorageKey('wrongWords'))||'[]');data.wrongWords.forEach(function(cw){var f=lw.find(function(m){return m.word===cw.word;});if(f)f.count=Math.max(f.count||1,cw.count||1);else lw.push(cw);});localStorage.setItem(getStorageKey('wrongWords'),JSON.stringify(lw));updateWrongWordsBtn();}
+                            if(data.checkin&&data.checkin.dates){var lc=JSON.parse(localStorage.getItem(getStorageKey('checkin'))||'{"dates":[],"streak":0}');var as={};lc.dates.forEach(function(d){as[d]=1;});data.checkin.dates.forEach(function(d){as[d]=1;});var ad=Object.keys(as).sort();var st=ad.length>0?1:0;for(var i=ad.length-1;i>0;i--){if((new Date(ad[i])-new Date(ad[i-1]))/86400000===1)st++;else break;}localStorage.setItem(getStorageKey('checkin'),JSON.stringify({dates:ad,streak:st}));updateCheckinDisplay(st);}
                         }
                     })
                     .catch(err => console.log('Firebase加载失败:', err));
@@ -1221,7 +1309,7 @@
 
         // 页面关闭前自动保存
         window.addEventListener('beforeunload', function() {
-            if (currentMode && currentQuestionIndex < 15 && currentQuestionIndex > 0) {
+            if (currentMode && currentQuestionIndex < totalQuestions && currentQuestionIndex > 0) {
                 saveGameProgress();
             }
         });
@@ -1233,10 +1321,93 @@
             if (lastPlayer) {
                 document.getElementById('playerNameInput').value = lastPlayer;
             }
+            document.getElementById('playerNameInput').addEventListener('keypress',function(e){if(e.key==='Enter')loginPlayer();});
         });
 
 
         // 激励语
+
+        // ========== Grade Selection ==========
+        function toggleAllGrades(checked){
+            document.querySelectorAll('.grade-grid input[type="checkbox"]').forEach(function(cb){cb.checked=checked;});
+            updateGradeSelection();
+        }
+        function updateGradeSelection(){
+            var m=[['cb_g3s1','grade3_semester1'],['cb_g3s2','grade3_semester2'],['cb_g4s1','grade4_semester1'],['cb_g4s2','grade4_semester2'],['cb_g5s1','grade5_semester1'],['cb_g5s2','grade5_semester2'],['cb_g6s1','grade6_semester1'],['cb_g6s2','grade6_semester2']];
+            m.forEach(function(p){var l=document.getElementById(p[0]);var cb=l.querySelector('input');selectedGrades[p[1]]=cb.checked;if(cb.checked)l.classList.add('selected');else l.classList.remove('selected');});
+            document.getElementById('selectAllGrades').checked=Object.values(selectedGrades).every(function(v){return v;});
+        }
+        function setQuestionCount(count){
+            totalQuestions=count;
+            document.querySelectorAll('.count-btn').forEach(function(b){b.classList.remove('selected');if(b.textContent.trim()===count+'题')b.classList.add('selected');});
+        }
+        // ========== Wrong Words ==========
+        function getWrongWordsData(){return JSON.parse(localStorage.getItem(getStorageKey('wrongWords'))||'[]');}
+        function saveWrongWord(wo){
+            var ww=getWrongWordsData();var ex=ww.find(function(w){return w.word===wo.word;});
+            if(ex){ex.count=(ex.count||1)+1;ex.lastWrong=Date.now();}else{ww.push({word:wo.word,chinese:wo.chinese,count:1,lastWrong:Date.now()});}
+            localStorage.setItem(getStorageKey('wrongWords'),JSON.stringify(ww));updateWrongWordsBtn();
+            if(isFirebaseReady&&firebaseDB){firebaseDB.ref('players/'+currentPlayerName+'/wrongWords').set(ww).catch(function(e){});}
+        }
+        function removeWrongWord(w){
+            var ww=getWrongWordsData().filter(function(x){return x.word!==w;});
+            localStorage.setItem(getStorageKey('wrongWords'),JSON.stringify(ww));updateWrongWordsBtn();
+        }
+        function updateWrongWordsBtn(){
+            var ww=getWrongWordsData();var b=document.getElementById('wrongWordsBtn');var cn=document.getElementById('wrongWordsCount');
+            if(b)b.style.display=ww.length>0?'block':'none';if(cn)cn.textContent=ww.length;
+        }
+        function showWrongNotebook(){
+            document.getElementById('menuScreen').style.display='none';document.getElementById('wrongNotebookScreen').style.display='block';
+            var ww=getWrongWordsData();var list=document.getElementById('wrongWordsList');
+            if(ww.length===0){list.innerHTML='<div class="no-history">🎉 太棒了！没有错词！</div>';document.getElementById('practiceWrongBtn').style.display='none';return;}
+            document.getElementById('practiceWrongBtn').style.display='block';
+            list.innerHTML=ww.map(function(w){return '<div class="wrong-word-item"><div><div class="wrong-word-english">'+w.word+'</div><div class="wrong-word-chinese">'+w.chinese+'</div></div><div style="display:flex;align-items:center;gap:10px"><span class="wrong-word-count">错'+(w.count||1)+'次</span><button class="wrong-word-play" data-word="'+encodeURIComponent(w.word)+'" onclick="speak(decodeURIComponent(this.dataset.word))">🔊</button></div></div>';}).join('');
+        }
+        function clearWrongWords(){
+            if(confirm('确定要清空错词本吗？')){localStorage.removeItem(getStorageKey('wrongWords'));updateWrongWordsBtn();showWrongNotebook();}
+        }
+        function startWrongWordsGame(){
+            var ww=getWrongWordsData();if(ww.length===0){alert('错词本为空！');return;}
+            currentMode='read';currentQuestionIndex=0;score=0;
+            var cnt=Math.min(ww.length,totalQuestions);gameQuestions=ww.sort(function(){return Math.random()-0.5;}).slice(0,cnt);
+            window._origTotal=totalQuestions;window._isWrongMode=true;totalQuestions=cnt;
+            document.getElementById('menuScreen').style.display='none';document.getElementById('wrongNotebookScreen').style.display='none';
+            document.getElementById('gameScreen').style.display='block';document.getElementById('resultScreen').style.display='none';
+            document.getElementById('historyScreen').style.display='none';document.getElementById('submitBtn').style.display='none';
+            displayQuestion();
+        }
+        // ========== Leaderboard ==========
+        function showLeaderboard(){
+            document.getElementById('menuScreen').style.display='none';document.getElementById('leaderboardScreen').style.display='block';
+            var list=document.getElementById('leaderboardList');list.innerHTML='<div class="no-history">加载中...</div>';
+            if(isFirebaseReady&&firebaseDB){
+                firebaseDB.ref('players').once('value').then(function(snap){
+                    var d=snap.val();if(!d){list.innerHTML='<div class="no-history">暂无数据</div>';return;}
+                    var sc=[];Object.keys(d).forEach(function(n){var p=d[n];if(p.history&&Array.isArray(p.history)){sc.push({name:n,score:Math.max.apply(null,p.history.map(function(h){return h.score||0;}))});}});
+                    sc.sort(function(a,b){return b.score-a.score;});var top=sc.slice(0,20);
+                    if(top.length===0){list.innerHTML='<div class="no-history">暂无排行数据</div>';return;}
+                    var icons=['🥇','🥈','🥉'];
+                    list.innerHTML=top.map(function(it,i){var r=i<3?icons[i]:(i+1);return '<div class="leaderboard-item"><span class="leaderboard-rank">'+r+'</span><span class="leaderboard-name">'+it.name+'</span><span class="leaderboard-score">'+it.score+' 分</span></div>';}).join('');
+                }).catch(function(){list.innerHTML='<div class="no-history">加载失败</div>';});
+            }else{
+                var h=JSON.parse(localStorage.getItem(getStorageKey('history'))||'[]');
+                if(h.length===0){list.innerHTML='<div class="no-history">暂无数据</div>';return;}
+                var best=Math.max.apply(null,h.map(function(x){return x.score||0;}));
+                list.innerHTML='<div class="leaderboard-item"><span class="leaderboard-rank">🥇</span><span class="leaderboard-name">'+currentPlayerName+'</span><span class="leaderboard-score">'+best+' 分</span></div>';
+            }
+        }
+        // ========== Daily Checkin ==========
+        function recordCheckin(){
+            var today=new Date().toISOString().slice(0,10);
+            var cd=JSON.parse(localStorage.getItem(getStorageKey('checkin'))||'{"dates":[],"streak":0}');
+            if(cd.dates.indexOf(today)!==-1)return;cd.dates.push(today);cd.dates.sort();
+            var streak=1;for(var i=cd.dates.length-1;i>0;i--){if((new Date(cd.dates[i])-new Date(cd.dates[i-1]))/86400000===1)streak++;else break;}
+            cd.streak=streak;localStorage.setItem(getStorageKey('checkin'),JSON.stringify(cd));updateCheckinDisplay(streak);
+            if(isFirebaseReady&&firebaseDB){firebaseDB.ref('players/'+currentPlayerName+'/checkin').set(cd).catch(function(){});}
+        }
+        function updateCheckinDisplay(s){var el=document.getElementById('streakNum');if(el)el.textContent=s||0;}
+        function loadCheckinData(){var cd=JSON.parse(localStorage.getItem(getStorageKey('checkin'))||'{"dates":[],"streak":0}');updateCheckinDisplay(cd.streak);}
         const praiseWords = ['Amazing!', 'Excellent!', 'Great!', 'Good!', '太棒了!', '你真厉害!', '继续加油!'];
         const wrongWords = ['哎呀，错啦！', '别灰心！', '再想想！'];
 
@@ -1247,7 +1418,7 @@
             if (!audioContext) {
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
             }
-            if (audioContext.state === 'suspended') {
+            if (audioContext && audioContext.state === 'suspended') {
                 audioContext.resume();
             }
         }
@@ -1312,11 +1483,14 @@
         // 合并所有词汇
         function getAllVocabulary() {
             let allWords = [];
-            Object.values(vocabularyDatabase).forEach(grade => {
-                Object.values(grade).forEach(semester => {
-                    allWords = allWords.concat(semester);
+            ['grade3','grade4','grade5','grade6'].forEach(gk => {
+                ['semester1','semester2'].forEach(sk => {
+                    if (selectedGrades[gk+'_'+sk] && vocabularyDatabase[gk] && vocabularyDatabase[gk][sk]) {
+                        allWords = allWords.concat(vocabularyDatabase[gk][sk]);
+                    }
                 });
             });
+            if (allWords.length===0) { Object.values(vocabularyDatabase).forEach(g => { Object.values(g).forEach(s => { allWords=allWords.concat(s); }); }); }
             return allWords;
         }
 
@@ -1339,10 +1513,12 @@
 
         // 开始游戏
         function startGame(mode) {
+            var av=getAllVocabulary();
+            if(av.length<4){alert('可用单词太少，请至少选择一个年级！');return;}
             currentMode = mode;
             currentQuestionIndex = 0;
             score = 0;
-            gameQuestions = getRandomQuestions(15);
+            gameQuestions = getRandomQuestions(Math.min(totalQuestions,av.length));
             
             document.getElementById('menuScreen').style.display = 'none';
             document.getElementById('gameScreen').style.display = 'block';
@@ -1366,8 +1542,8 @@
             document.getElementById('wordInput').value = '';
             
             // 更新进度
-            document.getElementById('progressFill').textContent = `${currentQuestionIndex + 1} / 15`;
-            document.getElementById('progressFill').style.width = `${((currentQuestionIndex + 1) / 15) * 100}%`;
+            document.getElementById('progressFill').textContent = `${currentQuestionIndex + 1} / ${totalQuestions}`;
+            document.getElementById('progressFill').style.width = `${((currentQuestionIndex + 1) / totalQuestions) * 100}%`;
             
             // 更新分数
             document.getElementById('scoreDisplay').textContent = score;
@@ -1438,6 +1614,12 @@
                 };
                 
                 setTimeout(() => playAudio(), 500);
+            } else if (currentMode === 'reverse') {
+                questionText.textContent = question.chinese;
+                var ca=question;var wo=getWrongOptions(question,3);
+                var ao=wo.concat(ca).sort(function(){return Math.random()-0.5;});
+                ao.forEach(function(opt){var btn=document.createElement('button');btn.className='option-btn';btn.textContent=opt.word;btn.onclick=function(){checkAnswer(opt.word,ca.word,btn);};optionsArea.appendChild(btn);});
+                document.getElementById('submitBtn').style.display='none';
             }
         }
 
@@ -1500,13 +1682,17 @@
             if (currentMode === 'write' && !isCorrect) {
                 feedback.textContent = `哎呀，错啦！正确答案是: ${correctAnswer}`;
             }
+            var cw=gameQuestions[currentQuestionIndex].word;
+            setTimeout(function(){speak(cw);},800);
+            if(!isCorrect){saveWrongWord(gameQuestions[currentQuestionIndex]);}
+            else if(window._isWrongMode){removeWrongWord(cw);}
         }
 
         // 下一题
         function nextQuestion() {
             currentQuestionIndex++;
             
-            if (currentQuestionIndex >= 15) {
+            if (currentQuestionIndex >= totalQuestions) {
                 showResult();
             } else {
                 displayQuestion();
@@ -1516,6 +1702,8 @@
 
         // 显示结果
         function showResult() {
+            if(window._isWrongMode){totalQuestions=window._origTotal||15;window._isWrongMode=false;}
+            recordCheckin();
             // 保存得分到历史记录
             saveScore(currentMode, score);
             
@@ -1561,6 +1749,9 @@
             document.getElementById('gameScreen').style.display = 'none';
             document.getElementById('resultScreen').style.display = 'none';
             document.getElementById('historyScreen').style.display = 'none';
+            if(document.getElementById('wrongNotebookScreen'))document.getElementById('wrongNotebookScreen').style.display='none';
+            if(document.getElementById('leaderboardScreen'))document.getElementById('leaderboardScreen').style.display='none';
+            updateWrongWordsBtn();loadCheckinData();
         }
 
         // 计时器
@@ -1594,18 +1785,20 @@
                         }
                         
                         document.getElementById('nextBtn').style.display = 'block';
+                        saveWrongWord(gameQuestions[currentQuestionIndex]);
+                        setTimeout(function(){speak(gameQuestions[currentQuestionIndex].word);},600);
                         
                         // 显示正确答案
                         if (currentMode !== 'write') {
                             const allOptions = document.querySelectorAll('.option-btn');
                             allOptions.forEach(btn => {
-                                if (currentMode === 'listen') {
+                                if (currentMode === 'listen' || currentMode === 'read') {
                                     const correctAnswer = gameQuestions[currentQuestionIndex].chinese;
                                     if (btn.textContent === correctAnswer) {
                                         btn.classList.add('correct');
                                     }
-                                } else if (currentMode === 'read') {
-                                    const correctAnswer = gameQuestions[currentQuestionIndex].chinese;
+                                } else if (currentMode === 'reverse') {
+                                    const correctAnswer = gameQuestions[currentQuestionIndex].word;
                                     if (btn.textContent === correctAnswer) {
                                         btn.classList.add('correct');
                                     }
@@ -1666,7 +1859,8 @@
             const modeNames = {
                 'listen': '听音选单词',
                 'read': '看单词选中文',
-                'write': '听音写单词'
+                'write': '听音写单词',
+                'reverse': '看中文选英语'
             };
 
             historyList.innerHTML = history.map((record, index) => {
