@@ -221,6 +221,29 @@
             border-color: #f5576c;
         }
 
+        .option-btn:disabled,
+        .submit-btn:disabled,
+        .play-audio-btn:disabled,
+        .bottom-btn:disabled,
+        .mode-btn:disabled {
+            cursor: not-allowed;
+            opacity: 0.7;
+            transform: none !important;
+            box-shadow: none !important;
+        }
+
+        .option-btn:focus-visible,
+        .submit-btn:focus-visible,
+        .play-audio-btn:focus-visible,
+        .bottom-btn:focus-visible,
+        .mode-btn:focus-visible,
+        .count-btn:focus-visible,
+        .word-input:focus-visible,
+        .name-input:focus-visible {
+            outline: 4px solid #667eea55;
+            outline-offset: 3px;
+        }
+
         .input-area {
             text-align: center;
             margin-bottom: 30px;
@@ -1132,6 +1155,7 @@ let isAnswered = false;
         let currentPlayerName = '';
         let firebaseDB = null;
         let isFirebaseReady = false;
+        let pendingAudioTimeouts = [];
 
         // ========== Firebase 配置 ==========
         // 请替换为你自己的 Firebase 配置（从 Firebase Console 获取）
@@ -1190,6 +1214,7 @@ let isAnswered = false;
             }
             currentPlayerName = name;
             localStorage.setItem('englishGameLastPlayer', name);
+            nameInput.style.borderColor = '#e0e0e0';
 
             document.getElementById('loginScreen').style.display = 'none';
             document.getElementById('menuScreen').style.display = 'block';
@@ -1203,6 +1228,7 @@ let isAnswered = false;
 
         function switchPlayer() {
             clearInterval(timerInterval);
+            clearPendingAudio();
             document.getElementById('menuScreen').style.display = 'none';
             document.getElementById('gameScreen').style.display = 'none';
             document.getElementById('resultScreen').style.display = 'none';
@@ -1240,6 +1266,59 @@ let isAnswered = false;
             var submitBtn = document.getElementById('submitBtn');
             if (input) input.disabled = disabled;
             if (submitBtn) submitBtn.disabled = disabled;
+        }
+
+        function getSettingsKey() {
+            return 'englishGame_settings';
+        }
+
+        function saveUserSettings() {
+            localStorage.setItem(getSettingsKey(), JSON.stringify({
+                selectedGrades: selectedGrades,
+                totalQuestions: totalQuestions
+            }));
+        }
+
+        function loadUserSettings() {
+            try {
+                var settings = JSON.parse(localStorage.getItem(getSettingsKey()) || '{}');
+                if (settings.selectedGrades && typeof settings.selectedGrades === 'object') {
+                    selectedGrades = Object.assign({}, selectedGrades, settings.selectedGrades);
+                }
+                if ([5, 10, 15, 20].indexOf(settings.totalQuestions) !== -1) {
+                    totalQuestions = settings.totalQuestions;
+                }
+            } catch (e) {
+                console.log('读取设置失败，使用默认设置', e);
+            }
+        }
+
+        function applyGradeSelectionToInputs() {
+            var mapping = [['cb_g3s1','grade3_semester1'],['cb_g3s2','grade3_semester2'],['cb_g4s1','grade4_semester1'],['cb_g4s2','grade4_semester2'],['cb_g5s1','grade5_semester1'],['cb_g5s2','grade5_semester2'],['cb_g6s1','grade6_semester1'],['cb_g6s2','grade6_semester2']];
+            mapping.forEach(function(pair) {
+                var label = document.getElementById(pair[0]);
+                if (!label) return;
+                var checkbox = label.querySelector('input');
+                checkbox.checked = !!selectedGrades[pair[1]];
+            });
+        }
+
+        function clearPendingAudio() {
+            pendingAudioTimeouts.forEach(function(timeoutId) {
+                clearTimeout(timeoutId);
+            });
+            pendingAudioTimeouts = [];
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+            }
+        }
+
+        function scheduleQuestionAudio() {
+            clearPendingAudio();
+            pendingAudioTimeouts = [
+                setTimeout(playAudio, 500),
+                setTimeout(playAudio, 2000)
+            ];
         }
 
         // 保存游戏进度（断点续玩）
@@ -1378,6 +1457,8 @@ let isAnswered = false;
                 document.getElementById('playerNameInput').value = lastPlayer;
             }
             document.getElementById('playerNameInput').addEventListener('keypress',function(e){if(e.key==='Enter')loginPlayer();});
+            loadUserSettings();
+            applyGradeSelectionToInputs();
             updateGradeSelection();
             setQuestionCount(totalQuestions);
         });
@@ -1394,10 +1475,12 @@ let isAnswered = false;
             var m=[['cb_g3s1','grade3_semester1'],['cb_g3s2','grade3_semester2'],['cb_g4s1','grade4_semester1'],['cb_g4s2','grade4_semester2'],['cb_g5s1','grade5_semester1'],['cb_g5s2','grade5_semester2'],['cb_g6s1','grade6_semester1'],['cb_g6s2','grade6_semester2']];
             m.forEach(function(p){var l=document.getElementById(p[0]);var cb=l.querySelector('input');selectedGrades[p[1]]=cb.checked;if(cb.checked)l.classList.add('selected');else l.classList.remove('selected');});
             document.getElementById('selectAllGrades').checked=Object.values(selectedGrades).every(function(v){return v;});
+            saveUserSettings();
         }
         function setQuestionCount(count){
             totalQuestions=count;
             document.querySelectorAll('.count-btn').forEach(function(b){b.classList.remove('selected');if(b.textContent.trim()===count+'题')b.classList.add('selected');});
+            saveUserSettings();
         }
         // ========== Wrong Words ==========
         function getWrongWordsData(){return JSON.parse(localStorage.getItem(getStorageKey('wrongWords'))||'[]');}
@@ -1420,8 +1503,9 @@ let isAnswered = false;
             document.getElementById('menuScreen').style.display='none';document.getElementById('wrongNotebookScreen').style.display='block';
             var ww=getWrongWordsData();var list=document.getElementById('wrongWordsList');
             if(ww.length===0){list.innerHTML='<div class="no-history">🎉 太棒了！没有错词！</div>';document.getElementById('practiceWrongBtn').style.display='none';return;}
+            var sortedWords=ww.slice().sort(function(a,b){return (b.count||1)-(a.count||1)||(b.lastWrong||0)-(a.lastWrong||0);});
             document.getElementById('practiceWrongBtn').style.display='block';
-            list.innerHTML=ww.map(function(w){var safeWord=escapeHtml(w.word);var safeChinese=escapeHtml(w.chinese);return '<div class="wrong-word-item"><div><div class="wrong-word-english">'+safeWord+'</div><div class="wrong-word-chinese">'+safeChinese+'</div></div><div style="display:flex;align-items:center;gap:10px"><span class="wrong-word-count">错'+(w.count||1)+'次</span><button class="wrong-word-play" data-word="'+encodeURIComponent(w.word)+'" onclick="speak(decodeURIComponent(this.dataset.word))">🔊</button></div></div>';}).join('');
+            list.innerHTML=sortedWords.map(function(w){var safeWord=escapeHtml(w.word);var safeChinese=escapeHtml(w.chinese);return '<div class="wrong-word-item"><div><div class="wrong-word-english">'+safeWord+'</div><div class="wrong-word-chinese">'+safeChinese+'</div></div><div style="display:flex;align-items:center;gap:10px"><span class="wrong-word-count">错'+(w.count||1)+'次</span><button class="wrong-word-play" data-word="'+encodeURIComponent(w.word)+'" onclick="speak(decodeURIComponent(this.dataset.word))">🔊</button></div></div>';}).join('');
         }
         function clearWrongWords(){
             if(confirm('确定要清空错词本吗？')){localStorage.removeItem(getStorageKey('wrongWords'));if(isFirebaseReady&&firebaseDB){firebaseDB.ref('players/'+currentPlayerName+'/wrongWords').remove().catch(function(){});}updateWrongWordsBtn();showWrongNotebook();}
@@ -1592,6 +1676,7 @@ let isAnswered = false;
         function startGame(mode) {
             var av=getAllVocabulary();
             if(av.length<4){alert('可用单词太少，请至少选择一个年级！');return;}
+            clearPendingAudio();
             currentMode = mode;
             currentQuestionIndex = 0;
             score = 0;
@@ -1657,8 +1742,7 @@ let isAnswered = false;
                     optionsArea.appendChild(btn);
                 });
                 
-                setTimeout(() => playAudio(), 500);
-                setTimeout(() => playAudio(), 2000);
+                scheduleQuestionAudio();
                 
             } else if (currentMode === 'read') {
                 // 看单词选中文模式
@@ -1693,8 +1777,7 @@ let isAnswered = false;
                     }
                 };
                 
-                setTimeout(() => playAudio(), 500);
-                setTimeout(() => playAudio(), 2000);
+                scheduleQuestionAudio();
             } else if (currentMode === 'reverse') {
                 questionText.textContent = question.chinese;
                 var ca=question;var wo=getWrongOptions(question,3,'word');
@@ -1762,11 +1845,11 @@ let isAnswered = false;
             document.getElementById('nextBtn').style.display = 'block';
             
             // 听音写单词模式下显示正确答案
+            const currentWord = gameQuestions[currentQuestionIndex];
             if (currentMode === 'write' && !isCorrect) {
-                feedback.textContent = `哎呀，错啦！正确答案是: ${correctAnswer}`;
+                feedback.textContent = `哎呀，错啦！正确答案是: ${currentWord.word}`;
             }
             // auto-play removed
-            const currentWord = gameQuestions[currentQuestionIndex];
             if(!isCorrect){saveWrongWord(currentWord);}
             else if(window._isWrongMode){removeWrongWord(currentWord.word);}
         }
@@ -1785,6 +1868,7 @@ let isAnswered = false;
 
         // 显示结果
         function showResult() {
+            clearPendingAudio();
             if(window._isWrongMode){totalQuestions=window._origTotal||15;window._isWrongMode=false;}
             recordCheckin();
             // 保存得分到历史记录
@@ -1795,10 +1879,13 @@ let isAnswered = false;
             
             document.getElementById('finalScore').textContent = `${score} 分`;
             
+            const maxScore = getCurrentQuestionCount() * 10;
+            const accuracy = maxScore ? score / maxScore : 0;
+
             // 显示星星
             const starsContainer = document.getElementById('stars');
             starsContainer.innerHTML = '';
-            const starCount = Math.ceil(score / 50);
+            const starCount = Math.ceil(accuracy * 5);
             for (let i = 0; i < starCount && i < 5; i++) {
                 const star = document.createElement('span');
                 star.className = 'star';
@@ -1809,11 +1896,11 @@ let isAnswered = false;
             
             // 显示评价
             const resultMessage = document.getElementById('resultMessage');
-            if (score >= 140) {
+            if (accuracy >= 0.9) {
                 resultMessage.textContent = '太棒了！你是英语小天才！🎉';
-            } else if (score >= 100) {
+            } else if (accuracy >= 0.75) {
                 resultMessage.textContent = '很不错！继续加油！💪';
-            } else if (score >= 60) {
+            } else if (accuracy >= 0.5) {
                 resultMessage.textContent = '还可以哦，多练习会更好！😊';
             } else {
                 resultMessage.textContent = '别灰心，再接再厉！💪';
@@ -1828,6 +1915,7 @@ let isAnswered = false;
         // 返回主菜单
         function showMenu() {
             clearInterval(timerInterval);
+            clearPendingAudio();
             document.getElementById('menuScreen').style.display = 'block';
             document.getElementById('gameScreen').style.display = 'none';
             document.getElementById('resultScreen').style.display = 'none';
@@ -1892,6 +1980,49 @@ let isAnswered = false;
                 }
             }, 1000);
         }
+
+        function handleGameKeyboardShortcuts(e) {
+            var gameScreen = document.getElementById('gameScreen');
+            if (!gameScreen || gameScreen.style.display !== 'block') return;
+
+            var activeElement = document.activeElement;
+            var isTyping = activeElement && (activeElement.id === 'wordInput' || activeElement.id === 'playerNameInput');
+            var nextBtn = document.getElementById('nextBtn');
+            var playButtonVisible = document.getElementById('playAudioBtn').style.display !== 'none';
+
+            if ((e.key === ' ' || e.code === 'Space') && playButtonVisible) {
+                e.preventDefault();
+                playAudio();
+                return;
+            }
+
+            if (e.key === 'Enter') {
+                if (nextBtn.style.display !== 'none') {
+                    e.preventDefault();
+                    nextQuestion();
+                    return;
+                }
+                if (currentMode === 'write' && !isAnswered) {
+                    e.preventDefault();
+                    submitAnswer();
+                }
+                return;
+            }
+
+            if (isTyping) return;
+            if (isAnswered) return;
+
+            if (/^[1-4]$/.test(e.key)) {
+                var options = Array.from(document.querySelectorAll('.option-btn'));
+                var index = Number(e.key) - 1;
+                if (options[index]) {
+                    e.preventDefault();
+                    options[index].click();
+                }
+            }
+        }
+
+        document.addEventListener('keydown', handleGameKeyboardShortcuts);
 
         // 页面加载时恢复音频上下文
         document.addEventListener('click', function() {
