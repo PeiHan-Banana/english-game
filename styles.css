@@ -619,6 +619,33 @@
         .btn-daily { background:linear-gradient(45deg,#f6d365,#fda085); color:white; }
         .btn-review { background:linear-gradient(45deg,#84fab0,#8fd3f4); color:#333; }
         .btn-report { background:linear-gradient(45deg,#c3cfe2,#c3eaf7); color:#4a4a7a; }
+        .btn-account { background:linear-gradient(45deg,#8ec5fc,#e0c3fc); color:#3d3d65; }
+        .btn-admin { background:linear-gradient(45deg,#ffb199,#ff0844); color:white; }
+        .forgot-password-screen,
+        .account-center-screen,
+        .admin-manage-screen { display:none; text-align:center; padding:40px 20px; }
+        .account-subtitle { font-size:18px; color:#666; margin:0 auto 20px; max-width:520px; line-height:1.5; }
+        .account-card { background:linear-gradient(135deg,#667eea10,#764ba210); border-radius:18px; padding:22px; margin:0 auto 24px; max-width:560px; }
+        .account-row { display:flex; justify-content:space-between; align-items:center; gap:15px; background:white; border-radius:14px; padding:14px 18px; margin-bottom:14px; }
+        .account-label { font-size:16px; color:#666; font-weight:bold; }
+        .account-value { font-size:18px; color:#764ba2; font-weight:bold; }
+        .account-input { max-width:420px; width:100%; }
+        .admin-player-item { background:linear-gradient(135deg,#fff4e6,#f7f0ff); border-radius:16px; padding:16px 18px; margin-bottom:12px; text-align:left; }
+        .admin-player-head { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:10px; }
+        .admin-player-name { font-size:20px; color:#333; font-weight:bold; }
+        .admin-player-tags { display:flex; gap:8px; flex-wrap:wrap; }
+        .admin-tag { padding:4px 10px; border-radius:999px; font-size:12px; font-weight:bold; background:#ffffff; color:#764ba2; }
+        .admin-player-meta { font-size:14px; color:#666; margin-bottom:12px; line-height:1.5; }
+        .admin-actions { display:flex; gap:10px; flex-wrap:wrap; }
+        .mini-btn { padding:10px 16px; border:none; border-radius:12px; cursor:pointer; font-family:'Comic Sans MS','Microsoft YaHei',cursive; font-size:15px; font-weight:bold; }
+        .mini-btn-reset { background:linear-gradient(45deg,#84fab0,#8fd3f4); color:#333; }
+        .mini-btn-delete { background:linear-gradient(45deg,#ff758c,#ff7eb3); color:white; }
+        @media (max-width: 600px) {
+            .account-row,
+            .admin-player-head { flex-direction:column; align-items:flex-start; }
+            .admin-actions { width:100%; }
+            .mini-btn { width:100%; }
+        }
         .report-screen { display:none; text-align:center; padding:40px 20px; }
         .report-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:15px; margin-bottom:30px; }
         .report-card { background:linear-gradient(135deg,#667eea15,#764ba215); border-radius:18px; padding:20px; text-align:center; }

@@ -39,6 +39,9 @@
             <button class="mode-btn btn-listen" id="loginBtn" onclick="loginPlayer()" style="margin-top: 10px;">
                 登录 / 注册
             </button>
+            <button class="mode-btn btn-history" type="button" onclick="showForgotPasswordScreen()" style="margin-top: 12px;">
+                忘记密码提示
+            </button>
         </div>
         <div class="menu-screen" id="menuScreen" style="display: none;">
 
@@ -86,10 +89,10 @@
                      看中文选英文
                 </button>
                 <button class="mode-btn btn-daily" onclick="startDailyChallenge()">
-                     📅 每日挑战
+                      每日挑战
                 </button>
                 <button class="mode-btn btn-review" onclick="startSmartReview()">
-                     🧠 智能复习
+                      智能复习
                 </button>
                 <button class="mode-btn btn-wrong-words" onclick="showWrongNotebook()" id="wrongWordsBtn" style="display:none">
                      错词本 (<span id="wrongWordsCount">0</span>)
@@ -98,10 +101,16 @@
                      查看历史得分
                 </button>
                 <button class="mode-btn btn-report" onclick="showReport()">
-                     📘 学习报告
+                      学习报告
                 </button>
                 <button class="mode-btn btn-leaderboard" onclick="showLeaderboard()">
                      排行榜
+                </button>
+                <button class="mode-btn btn-account" onclick="showAccountCenter()">
+                     账号中心
+                </button>
+                <button class="mode-btn btn-admin" id="adminManageBtn" onclick="showAdminManageScreen()" style="display: none;">
+                     管理员账号管理
                 </button>
                 <button class="mode-btn btn-resume" id="resumeBtn" onclick="resumeGame()" style="display: none;">
                      继续上次游戏
@@ -215,6 +224,47 @@
             <div id="leaderboardList" class="history-list"></div>
             <div class="mode-buttons">
                 <button class="mode-btn btn-menu" onclick="showMenu()">🏠 返回主菜单</button>
+            </div>
+        </div>
+        <div class="forgot-password-screen" id="forgotPasswordScreen">
+            <h2 class="history-title">找回密码提示</h2>
+            <p class="account-subtitle">输入玩家名字，查看你之前设置的密码提示</p>
+            <input type="text" class="name-input" id="forgotPlayerNameInput" placeholder="玩家名字" maxlength="10">
+            <div class="login-message" id="forgotPasswordMessage"></div>
+            <div class="account-card" id="forgotPasswordHintCard" style="display:none;">
+                <div class="account-row"><span class="account-label">密码提示</span><span class="account-value" id="forgotPasswordHintText">未设置</span></div>
+            </div>
+            <div class="mode-buttons">
+                <button class="mode-btn btn-report" onclick="lookupPasswordHint()">查看提示</button>
+                <button class="mode-btn btn-menu" onclick="showLoginScreenFromUtility()">返回登录</button>
+            </div>
+        </div>
+
+        <div class="account-center-screen" id="accountCenterScreen">
+            <h2 class="history-title">账号中心</h2>
+            <p class="account-subtitle">修改密码，并设置忘记密码时显示的提示</p>
+            <div class="account-card">
+                <div class="account-row"><span class="account-label">当前账号</span><span class="account-value" id="accountCenterPlayerName">-</span></div>
+                <input type="password" class="name-input password-input account-input" id="currentPasswordForChange" placeholder="当前密码" maxlength="20">
+                <input type="password" class="name-input password-input account-input" id="newPasswordForChange" placeholder="新密码（至少 4 位）" maxlength="20">
+                <input type="password" class="name-input password-input account-input" id="confirmPasswordForChange" placeholder="确认新密码" maxlength="20">
+                <input type="text" class="name-input account-input" id="passwordHintInput" placeholder="密码提示（可选）" maxlength="20">
+                <div class="login-message" id="accountCenterMessage"></div>
+            </div>
+            <div class="mode-buttons">
+                <button class="mode-btn btn-write" onclick="updatePlayerPasswordAndHint()">保存账号设置</button>
+                <button class="mode-btn btn-menu" onclick="showMenu()">返回主菜单</button>
+            </div>
+        </div>
+
+        <div class="admin-manage-screen" id="adminManageScreen">
+            <h2 class="history-title">管理员账号管理</h2>
+            <p class="account-subtitle">可删除玩家账号，或重置为临时密码</p>
+            <div class="login-message" id="adminManageMessage"></div>
+            <div id="adminPlayerList" class="history-list"></div>
+            <div class="mode-buttons">
+                <button class="mode-btn btn-report" onclick="refreshAdminPlayerList()">刷新列表</button>
+                <button class="mode-btn btn-menu" onclick="showMenu()">返回主菜单</button>
             </div>
         </div>
     </div>

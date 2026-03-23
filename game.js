@@ -2001,3 +2001,396 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+SCREEN_IDS.push('forgotPasswordScreen', 'accountCenterScreen', 'adminManageScreen');
+
+var currentPlayerAccount = null;
+var DEFAULT_ADMIN_NAMES = ['admin', '管理员'];
+
+function isDefaultAdminName(name) {
+    return DEFAULT_ADMIN_NAMES.indexOf(normalizeAnswer(name)) !== -1;
+}
+
+function normalizeAccountRecord(name, account) {
+    var base = account || {};
+    return {
+        displayName: base.displayName || name,
+        passwordHash: base.passwordHash || '',
+        passwordHint: base.passwordHint || '',
+        createdAt: base.createdAt || Date.now(),
+        updatedAt: base.updatedAt || Date.now(),
+        isAdmin: !!base.isAdmin || isDefaultAdminName(name)
+    };
+}
+
+async function getMergedAccountRecord(name) {
+    var localAccount = getStoredAccount(name);
+    var remotePlayer = await fetchRemotePlayerRecord(name);
+    var remoteAccount = remotePlayer && remotePlayer.auth ? remotePlayer.auth : null;
+    if (!localAccount && !remoteAccount) return null;
+    return normalizeAccountRecord(name, Object.assign({}, remoteAccount || {}, localAccount || {}));
+}
+
+async function saveAccountRecord(name, account) {
+    var normalized = normalizeAccountRecord(name, account);
+    saveStoredAccount(name, normalized);
+    await saveRemoteAccount(name, normalized);
+    return normalized;
+}
+
+function getPlayerStoragePrefix(name) {
+    return 'englishGame_' + name + '_';
+}
+
+function removePlayerLocalData(name) {
+    var keysToRemove = ['history', 'progress', 'wordStats', 'dailyChallenge', 'wrongWords', 'checkin'];
+    keysToRemove.forEach(function(key) {
+        localStorage.removeItem(getPlayerStoragePrefix(name) + key);
+    });
+}
+
+function setAdminManageButtonVisibility() {
+    var adminBtn = document.getElementById('adminManageBtn');
+    if (!adminBtn) return;
+    adminBtn.style.display = currentPlayerAccount && currentPlayerAccount.isAdmin ? 'block' : 'none';
+}
+
+function showLoginScreenFromUtility() {
+    clearInterval(timerInterval);
+    clearPendingAudio();
+    showOnlyScreen('loginScreen');
+    showLoginMessage('');
+}
+
+function showForgotPasswordScreen() {
+    var forgotNameInput = document.getElementById('forgotPlayerNameInput');
+    var playerNameInput = document.getElementById('playerNameInput');
+    if (forgotNameInput && playerNameInput) {
+        forgotNameInput.value = (playerNameInput.value || '').trim();
+    }
+    var hintCard = document.getElementById('forgotPasswordHintCard');
+    if (hintCard) hintCard.style.display = 'none';
+    var hintText = document.getElementById('forgotPasswordHintText');
+    if (hintText) hintText.textContent = '未设置';
+    var messageEl = document.getElementById('forgotPasswordMessage');
+    if (messageEl) {
+        messageEl.textContent = '';
+        messageEl.className = 'login-message';
+    }
+    showOnlyScreen('forgotPasswordScreen');
+}
+
+async function lookupPasswordHint() {
+    var nameInput = document.getElementById('forgotPlayerNameInput');
+    var messageEl = document.getElementById('forgotPasswordMessage');
+    var hintCard = document.getElementById('forgotPasswordHintCard');
+    var hintText = document.getElementById('forgotPasswordHintText');
+    var name = (nameInput.value || '').trim();
+    if (!name) {
+        messageEl.textContent = '请输入玩家名字';
+        messageEl.className = 'login-message error';
+        if (hintCard) hintCard.style.display = 'none';
+        return;
+    }
+    var account = await getMergedAccountRecord(name);
+    if (!account || !account.passwordHash) {
+        messageEl.textContent = '没有找到这个账号';
+        messageEl.className = 'login-message error';
+        if (hintCard) hintCard.style.display = 'none';
+        return;
+    }
+    messageEl.textContent = account.passwordHint ? '已找到密码提示' : '这个账号还没有设置密码提示';
+    messageEl.className = 'login-message success';
+    if (hintText) hintText.textContent = account.passwordHint || '未设置提示';
+    if (hintCard) hintCard.style.display = 'block';
+}
+
+function showAccountCenter() {
+    if (!currentPlayerName) {
+        alert('请先登录账号');
+        return;
+    }
+    var accountNameEl = document.getElementById('accountCenterPlayerName');
+    if (accountNameEl) accountNameEl.textContent = currentPlayerName;
+    var hintInput = document.getElementById('passwordHintInput');
+    if (hintInput) hintInput.value = currentPlayerAccount && currentPlayerAccount.passwordHint ? currentPlayerAccount.passwordHint : '';
+    ['currentPasswordForChange','newPasswordForChange','confirmPasswordForChange'].forEach(function(id) {
+        var input = document.getElementById(id);
+        if (input) input.value = '';
+    });
+    var messageEl = document.getElementById('accountCenterMessage');
+    if (messageEl) {
+        messageEl.textContent = '';
+        messageEl.className = 'login-message';
+    }
+    showOnlyScreen('accountCenterScreen');
+}
+
+async function updatePlayerPasswordAndHint() {
+    var currentPasswordInput = document.getElementById('currentPasswordForChange');
+    var newPasswordInput = document.getElementById('newPasswordForChange');
+    var confirmPasswordInput = document.getElementById('confirmPasswordForChange');
+    var hintInput = document.getElementById('passwordHintInput');
+    var messageEl = document.getElementById('accountCenterMessage');
+    var currentPassword = (currentPasswordInput.value || '').trim();
+    var newPassword = (newPasswordInput.value || '').trim();
+    var confirmPassword = (confirmPasswordInput.value || '').trim();
+    var passwordHint = (hintInput.value || '').trim();
+
+    if (!currentPlayerName || !currentPlayerAccount) {
+        messageEl.textContent = '请先登录账号';
+        messageEl.className = 'login-message error';
+        return;
+    }
+    if (!currentPassword) {
+        messageEl.textContent = '请输入当前密码';
+        messageEl.className = 'login-message error';
+        return;
+    }
+
+    var currentHash = await hashPlayerPassword(currentPlayerName, currentPassword);
+    if (currentHash !== currentPlayerAccount.passwordHash) {
+        messageEl.textContent = '当前密码不正确';
+        messageEl.className = 'login-message error';
+        return;
+    }
+    if (newPassword) {
+        if (newPassword.length < 4) {
+            messageEl.textContent = '新密码至少 4 位';
+            messageEl.className = 'login-message error';
+            return;
+        }
+        if (newPassword !== confirmPassword) {
+            messageEl.textContent = '两次输入的新密码不一致';
+            messageEl.className = 'login-message error';
+            return;
+        }
+    }
+
+    var updatedAccount = normalizeAccountRecord(currentPlayerName, currentPlayerAccount);
+    updatedAccount.passwordHint = passwordHint;
+    updatedAccount.updatedAt = Date.now();
+    if (newPassword) {
+        updatedAccount.passwordHash = await hashPlayerPassword(currentPlayerName, newPassword);
+    }
+    currentPlayerAccount = await saveAccountRecord(currentPlayerName, updatedAccount);
+    messageEl.textContent = newPassword ? '密码和提示已更新' : '密码提示已更新';
+    messageEl.className = 'login-message success';
+    currentPasswordInput.value = '';
+    newPasswordInput.value = '';
+    confirmPasswordInput.value = '';
+}
+
+async function fetchAllPlayerRecords() {
+    var localAccounts = getAccountsData();
+    var players = {};
+    Object.keys(localAccounts).forEach(function(key) {
+        var account = localAccounts[key];
+        var name = account.displayName || key;
+        players[name] = {
+            name: name,
+            auth: normalizeAccountRecord(name, account),
+            source: ['本地']
+        };
+    });
+    if (isFirebaseReady && firebaseDB) {
+        try {
+            var snapshot = await firebaseDB.ref('players').once('value');
+            var remotePlayers = snapshot.val() || {};
+            Object.keys(remotePlayers).forEach(function(name) {
+                if (!players[name]) {
+                    players[name] = { name: name, auth: null, source: [] };
+                }
+                players[name].remote = remotePlayers[name];
+                players[name].source.push('云端');
+                if (remotePlayers[name].auth) {
+                    players[name].auth = normalizeAccountRecord(name, Object.assign({}, remotePlayers[name].auth, players[name].auth || {}));
+                }
+            });
+        } catch (err) {
+            console.log('读取玩家列表失败', err);
+        }
+    }
+    return Object.keys(players).sort(function(a, b) { return a.localeCompare(b, 'zh-CN'); }).map(function(name) {
+        return players[name];
+    });
+}
+
+async function refreshAdminPlayerList() {
+    if (!currentPlayerAccount || !currentPlayerAccount.isAdmin) {
+        alert('只有管理员可以查看账号管理');
+        return;
+    }
+    var listEl = document.getElementById('adminPlayerList');
+    var messageEl = document.getElementById('adminManageMessage');
+    listEl.innerHTML = '<div class="no-history">加载中...</div>';
+    messageEl.textContent = '';
+    messageEl.className = 'login-message';
+
+    var players = await fetchAllPlayerRecords();
+    if (!players.length) {
+        listEl.innerHTML = '<div class="no-history">还没有玩家账号</div>';
+        return;
+    }
+    listEl.innerHTML = players.map(function(player) {
+        var auth = player.auth || {};
+        var tags = [];
+        if (auth.isAdmin) tags.push('管理员');
+        (player.source || []).forEach(function(item) { tags.push(item); });
+        var hintStatus = auth.passwordHint ? '已设置提示' : '未设置提示';
+        return '<div class="admin-player-item">'
+            + '<div class="admin-player-head">'
+            + '<div class="admin-player-name">' + escapeHtml(player.name) + '</div>'
+            + '<div class="admin-player-tags">' + tags.map(function(tag) { return '<span class="admin-tag">' + escapeHtml(tag) + '</span>'; }).join('') + '</div>'
+            + '</div>'
+            + '<div class="admin-player-meta">密码状态：' + (auth.passwordHash ? '已设置' : '未设置') + '，提示状态：' + hintStatus + '</div>'
+            + '<div class="admin-actions">'
+            + '<button class="mini-btn mini-btn-reset" onclick="adminResetPlayerPassword(' + JSON.stringify(player.name) + ')">重置密码</button>'
+            + '<button class="mini-btn mini-btn-delete" onclick="adminDeletePlayerAccount(' + JSON.stringify(player.name) + ')">删除账号</button>'
+            + '</div>'
+            + '</div>';
+    }).join('');
+}
+
+function showAdminManageScreen() {
+    if (!currentPlayerAccount || !currentPlayerAccount.isAdmin) {
+        alert('只有管理员可以进入账号管理');
+        return;
+    }
+    showOnlyScreen('adminManageScreen');
+    refreshAdminPlayerList();
+}
+
+async function adminResetPlayerPassword(name) {
+    if (!currentPlayerAccount || !currentPlayerAccount.isAdmin) return;
+    var tempPassword = Math.random().toString(36).slice(-6);
+    var account = await getMergedAccountRecord(name);
+    if (!account) {
+        alert('没有找到这个玩家');
+        return;
+    }
+    account.passwordHash = await hashPlayerPassword(name, tempPassword);
+    account.updatedAt = Date.now();
+    currentPlayerAccount = currentPlayerAccount && currentPlayerAccount.displayName === name ? account : currentPlayerAccount;
+    await saveAccountRecord(name, account);
+    var messageEl = document.getElementById('adminManageMessage');
+    messageEl.textContent = '已将 ' + name + ' 的密码重置为临时密码：' + tempPassword;
+    messageEl.className = 'login-message success';
+    refreshAdminPlayerList();
+}
+
+async function adminDeletePlayerAccount(name) {
+    if (!currentPlayerAccount || !currentPlayerAccount.isAdmin) return;
+    if (normalizeAnswer(name) === normalizeAnswer(currentPlayerName)) {
+        alert('不能删除当前登录的管理员账号');
+        return;
+    }
+    if (!confirm('确定要删除玩家 ' + name + ' 的账号和数据吗？')) {
+        return;
+    }
+    var accounts = getAccountsData();
+    delete accounts[getAccountLookupKey(name)];
+    saveAccountsData(accounts);
+    removePlayerLocalData(name);
+    if (isFirebaseReady && firebaseDB) {
+        try {
+            await firebaseDB.ref('players/' + name).remove();
+        } catch (err) {
+            console.log('删除云端玩家失败', err);
+        }
+    }
+    var messageEl = document.getElementById('adminManageMessage');
+    messageEl.textContent = '已删除玩家 ' + name;
+    messageEl.className = 'login-message success';
+    refreshAdminPlayerList();
+}
+
+var __originalFinishPlayerLoginExtended = finishPlayerLogin;
+finishPlayerLogin = function(name) {
+    __originalFinishPlayerLoginExtended(name);
+    currentPlayerAccount = normalizeAccountRecord(name, getStoredAccount(name) || {});
+    setAdminManageButtonVisibility();
+};
+
+var __originalLoginPlayerExtended = loginPlayer;
+loginPlayer = async function() {
+    var passwordInput = document.getElementById('playerPasswordInput');
+    var nameInput = document.getElementById('playerNameInput');
+    var name = (nameInput.value || '').trim();
+    await __originalLoginPlayerExtended();
+    if (!currentPlayerName || normalizeAnswer(currentPlayerName) !== normalizeAnswer(name)) {
+        return;
+    }
+    var account = await getMergedAccountRecord(currentPlayerName);
+    if (account) {
+        if (!account.passwordHint) account.passwordHint = '';
+        account.isAdmin = account.isAdmin || isDefaultAdminName(currentPlayerName);
+        account.updatedAt = Date.now();
+        currentPlayerAccount = await saveAccountRecord(currentPlayerName, account);
+    }
+    if (passwordInput) passwordInput.value = '';
+    setAdminManageButtonVisibility();
+};
+
+var __originalShowMenuScreenExtended = showMenuScreen;
+showMenuScreen = function() {
+    __originalShowMenuScreenExtended();
+    setAdminManageButtonVisibility();
+};
+
+var __originalSwitchPlayerFinal = switchPlayer;
+switchPlayer = function() {
+    __originalSwitchPlayerFinal();
+    currentPlayerAccount = null;
+    setAdminManageButtonVisibility();
+};
+function getNamedStorageKey(name, type) {
+    return 'englishGame_' + name + '_' + type;
+}
+
+function hasMeaningfulStoredValue(value) {
+    if (value === null || value === undefined) return false;
+    return ['[]', '{}', '{"dates":[],"streak":0}', 'null', ''].indexOf(String(value).trim()) === -1;
+}
+
+function hasLocalLegacyPlayerData(name) {
+    var keys = ['history', 'progress', 'wordStats', 'dailyChallenge', 'wrongWords', 'checkin'];
+    return keys.some(function(key) {
+        return hasMeaningfulStoredValue(localStorage.getItem(getNamedStorageKey(name, key)));
+    });
+}
+
+function hasRemoteLegacyPlayerData(playerData) {
+    if (!playerData) return false;
+    var keys = ['history', 'progress', 'wordStats', 'dailyChallenge', 'wrongWords', 'checkin'];
+    return keys.some(function(key) {
+        var value = playerData[key];
+        if (Array.isArray(value)) return value.length > 0;
+        if (value && typeof value === 'object') return Object.keys(value).length > 0;
+        return !!value;
+    });
+}
+
+function needsLegacyAccountProtection(name, localAccount, remoteAccount, remotePlayer) {
+    if (localAccount || remoteAccount) return false;
+    return hasLocalLegacyPlayerData(name) || hasRemoteLegacyPlayerData(remotePlayer);
+}
+
+var __originalLegacyProtectedLoginPlayer = loginPlayer;
+loginPlayer = async function() {
+    var nameInput = document.getElementById('playerNameInput');
+    var name = (nameInput && nameInput.value || '').trim();
+
+    if (name) {
+        var remotePlayer = await fetchRemotePlayerRecord(name);
+        var remoteAccount = remotePlayer && remotePlayer.auth && remotePlayer.auth.passwordHash ? remotePlayer.auth : null;
+        var localAccount = getStoredAccount(name);
+        if (needsLegacyAccountProtection(name, localAccount, remoteAccount, remotePlayer)) {
+            clearLoginFormState();
+            if (nameInput) nameInput.style.borderColor = '#f5576c';
+            showLoginMessage('这个名字已有学习记录，但还没有绑定密码，请联系管理员重置或先完成账号迁移。', 'error');
+            return;
+        }
+    }
+
+    await __originalLegacyProtectedLoginPlayer();
+};
