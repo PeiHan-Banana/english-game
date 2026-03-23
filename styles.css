@@ -476,6 +476,12 @@
             padding: 40px 20px;
         }
 
+        .login-subtitle {
+            font-size: 20px;
+            color: #764ba2;
+            margin-bottom: 25px;
+        }
+
         .name-input {
             padding: 20px 30px;
             font-size: 28px;
@@ -489,11 +495,39 @@
             margin: 0 auto 20px;
         }
 
+        .password-input {
+            font-size: 24px;
+            letter-spacing: 1px;
+        }
+
         .name-input:focus {
             outline: none;
             border-color: #667eea;
         }
 
+        .login-tip {
+            font-size: 15px;
+            color: #666;
+            margin: -4px auto 16px;
+            max-width: 360px;
+            line-height: 1.5;
+        }
+
+        .login-message {
+            min-height: 24px;
+            margin-bottom: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            color: #666;
+        }
+
+        .login-message.error {
+            color: #f5576c;
+        }
+
+        .login-message.success {
+            color: #2e9f67;
+        }
         .player-info {
             text-align: center;
             margin-bottom: 15px;
@@ -571,6 +605,14 @@
         .checkin-area { text-align:center; margin-bottom:12px; padding:10px 20px; background:linear-gradient(135deg,#43e97b15,#38f9d715); border-radius:15px; }
         .checkin-streak { font-size:17px; color:#333; }
         .checkin-streak .streak-num { color:#f5576c; font-weight:bold; font-size:22px; }
+        .study-focus-panel { margin-bottom:15px; padding:16px; border-radius:18px; background:linear-gradient(135deg,#fff8d6,#e7f6ff); box-shadow:0 8px 24px rgba(102,126,234,0.12); }
+        .study-focus-panel h3 { font-size:20px; color:#764ba2; margin-bottom:12px; text-align:center; }
+        .study-focus-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:10px; }
+        .study-focus-item { background:rgba(255,255,255,0.78); border-radius:14px; padding:12px; text-align:center; }
+        .study-focus-label { font-size:14px; color:#666; margin-bottom:6px; }
+        .study-focus-value { font-size:24px; color:#f5576c; font-weight:bold; }
+        .study-focus-note { font-size:12px; color:#888; margin-top:4px; }
+        .study-focus-tip { margin-top:12px; text-align:center; font-size:14px; color:#5f5f7a; line-height:1.5; }
         .btn-reverse { background:linear-gradient(45deg,#a18cd1,#fbc2eb); color:white; }
         .btn-wrong-words { background:linear-gradient(45deg,#f5576c,#ff8a5c); color:white; }
         .btn-leaderboard { background:linear-gradient(45deg,#ffd86f,#fc6262); color:white; }
@@ -604,4 +646,5 @@
             .trend-chart { min-height:190px; gap:10px; padding:16px 12px 8px; }
             .trend-bar { min-width:60px; }
             .trend-bar-track { height:120px; }
+            .study-focus-grid { grid-template-columns:repeat(2,1fr); }
         }

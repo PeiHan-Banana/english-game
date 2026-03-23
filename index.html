@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -30,14 +30,16 @@
 
 
         <div class="login-screen" id="loginScreen">
-            <h2 class="game-title">👋 欢迎来到英语闯关！</h2>
-            <p style="font-size: 20px; color: #764ba2; margin-bottom: 25px;">请输入你的名字</p>
+            <h2 class="game-title">欢迎来到英语闯关！</h2>
+            <p class="login-subtitle">请输入名字和密码</p>
             <input type="text" class="name-input" id="playerNameInput" placeholder="你的名字" maxlength="10">
-            <button class="mode-btn btn-listen" onclick="loginPlayer()" style="margin-top: 10px;">
-                🚀 开始游戏
+            <input type="password" class="name-input password-input" id="playerPasswordInput" placeholder="设置或输入密码" maxlength="20">
+            <p class="login-tip">新名字会自动注册，之后需要密码才能登录</p>
+            <div class="login-message" id="loginMessage" aria-live="polite"></div>
+            <button class="mode-btn btn-listen" id="loginBtn" onclick="loginPlayer()" style="margin-top: 10px;">
+                登录 / 注册
             </button>
         </div>
-
         <div class="menu-screen" id="menuScreen" style="display: none;">
 
             <div class="player-info" id="playerInfo" style="display: none;">

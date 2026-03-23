@@ -1507,3 +1507,497 @@ function clearHistory() {
     localStorage.removeItem(getStorageKey('history'));
     showHistory();
 }
+
+var SMART_REVIEW_DAY_MS = 24 * 60 * 60 * 1000;
+
+function getAdaptiveWordAccuracy(stats) {
+    return stats && stats.attempts ? (stats.correct || 0) / stats.attempts : 0;
+}
+
+function clampReviewNumber(value, min, max) {
+    return Math.min(max, Math.max(min, value));
+}
+
+function dedupeQuestionsByWordEnhanced(questions) {
+    var seen = {};
+    return questions.filter(function(question) {
+        var key = normalizeAnswer(question.word);
+        if (seen[key]) return false;
+        seen[key] = true;
+        return true;
+    });
+}
+
+getReviewState = function(stats) {
+    stats = stats || {};
+    var now = Date.now();
+    var nextReviewAt = stats.nextReviewAt || 0;
+    var dueInMs = nextReviewAt ? nextReviewAt - now : 0;
+    var isDue = !nextReviewAt || dueInMs <= 0;
+    return {
+        accuracy: getAdaptiveWordAccuracy(stats),
+        isDue: isDue,
+        overdueMs: isDue ? Math.abs(Math.min(dueInMs, 0)) : 0,
+        dueInHours: isDue ? 0 : Math.ceil(dueInMs / (60 * 60 * 1000)),
+        dueInDays: isDue ? 0 : Math.ceil(dueInMs / SMART_REVIEW_DAY_MS)
+    };
+};
+
+updateWordStats = function(question, isCorrect) {
+    if (!question || !question.word || !currentPlayerName) return;
+    var key = normalizeAnswer(question.word);
+    var allStats = getWordStatsData();
+    var now = Date.now();
+    var entry = allStats[key] || {
+        word: question.word,
+        chinese: question.chinese,
+        attempts: 0,
+        correct: 0,
+        wrong: 0,
+        streak: 0,
+        maxStreak: 0,
+        lastSeen: 0,
+        lastWrong: 0,
+        reviewLevel: 0,
+        nextReviewAt: 0,
+        lastResult: '',
+        firstSeen: now,
+        stabilityDays: 0.25,
+        difficulty: 0.45,
+        consecutiveWrong: 0
+    };
+
+    entry.word = question.word;
+    entry.chinese = question.chinese;
+    entry.attempts += 1;
+    entry.lastSeen = now;
+    entry.lastResult = isCorrect ? 'correct' : 'wrong';
+
+    if (isCorrect) {
+        entry.correct += 1;
+        entry.streak = (entry.streak || 0) + 1;
+        entry.maxStreak = Math.max(entry.maxStreak || 0, entry.streak);
+        entry.consecutiveWrong = 0;
+        entry.reviewLevel = Math.min((entry.reviewLevel || 0) + 1, 12);
+        var accuracyRate = getAdaptiveWordAccuracy({ attempts: entry.attempts, correct: entry.correct });
+        var currentStability = Math.max(entry.stabilityDays || 0.25, 0.25);
+        var streakBonus = Math.min(0.5, entry.streak * 0.08);
+        var accuracyBonus = Math.max(0, accuracyRate - 0.6) * 0.8;
+        var difficultyPenalty = (entry.difficulty || 0.45) * 0.6;
+        var growthFactor = clampReviewNumber(1.4 + streakBonus + accuracyBonus - difficultyPenalty + currentStability * 0.08, 1.3, 2.6);
+        entry.stabilityDays = clampReviewNumber(currentStability * growthFactor, 0.5, 45);
+        entry.difficulty = clampReviewNumber((entry.difficulty || 0.45) - 0.05 - Math.min(0.05, entry.streak * 0.01), 0.15, 0.95);
+    } else {
+        entry.wrong += 1;
+        entry.streak = 0;
+        entry.lastWrong = now;
+        entry.reviewLevel = 0;
+        entry.consecutiveWrong = (entry.consecutiveWrong || 0) + 1;
+        entry.difficulty = clampReviewNumber((entry.difficulty || 0.45) + 0.12, 0.15, 0.95);
+        entry.stabilityDays = clampReviewNumber(Math.max(entry.stabilityDays || 0.25, 0.25) * 0.45, 0.125, 12);
+    }
+
+    entry.nextReviewAt = now + Math.round(entry.stabilityDays * SMART_REVIEW_DAY_MS);
+    allStats[key] = entry;
+    saveWordStatsData(allStats);
+};
+
+calculateReviewWeight = function(question, statsMap, wrongWordMap) {
+    var key = normalizeAnswer(question.word);
+    var stats = statsMap[key] || {};
+    var attempts = stats.attempts || 0;
+    var wrong = stats.wrong || 0;
+    var accuracy = attempts ? getAdaptiveWordAccuracy(stats) : 0.55;
+    var reviewState = getReviewState(stats);
+    var weight = 1;
+
+    if (reviewState.isDue) {
+        weight += 7 + Math.min(8, reviewState.overdueMs / SMART_REVIEW_DAY_MS);
+    } else {
+        weight += Math.max(0, 2.5 - reviewState.dueInHours / 10);
+    }
+
+    weight += (wrongWordMap[key] || 0) * 4;
+    weight += wrong * 2;
+    weight += attempts ? (1 - accuracy) * 5 : 2;
+    weight += (stats.difficulty || 0.45) * 4;
+    weight += Math.max(0, 2 - Math.min(stats.stabilityDays || 0.25, 2));
+    weight += Math.min(3, (stats.consecutiveWrong || 0) * 1.2);
+
+    if ((stats.streak || 0) >= 4 && accuracy >= 0.85 && !reviewState.isDue) {
+        weight *= 0.4;
+    }
+
+    return weight;
+};
+
+function pickPriorityQuestionsEnhanced(pool, count, statsMap, wrongWordMap) {
+    if (!pool.length || count <= 0) return [];
+    var remaining = dedupeQuestionsByWordEnhanced(pool).slice();
+    var selected = [];
+
+    while (selected.length < count && remaining.length) {
+        var weights = remaining.map(function(question) {
+            return calculateReviewWeight(question, statsMap, wrongWordMap);
+        });
+        var totalWeight = weights.reduce(function(sum, value) { return sum + value; }, 0);
+        var roll = Math.random() * totalWeight;
+        var pickedIndex = 0;
+        for (var i = 0; i < remaining.length; i++) {
+            roll -= weights[i];
+            if (roll <= 0) {
+                pickedIndex = i;
+                break;
+            }
+        }
+        selected.push(remaining.splice(pickedIndex, 1)[0]);
+    }
+
+    return selected;
+}
+
+function buildSmartReviewQuestionsEnhanced(pool, count) {
+    var wrongWordMap = {};
+    getWrongWordsData().forEach(function(item) {
+        wrongWordMap[normalizeAnswer(item.word)] = item.count || 1;
+    });
+
+    var statsMap = getWordStatsData();
+    var buckets = { due: [], weak: [], fresh: [], reinforce: [] };
+
+    dedupeQuestionsByWordEnhanced(pool).forEach(function(question) {
+        var key = normalizeAnswer(question.word);
+        var stats = statsMap[key] || {};
+        var attempts = stats.attempts || 0;
+        var accuracy = getAdaptiveWordAccuracy(stats);
+        var reviewState = getReviewState(stats);
+        var isWeak = attempts > 0 && (accuracy < 0.75 || (wrongWordMap[key] || 0) >= 2 || (stats.consecutiveWrong || 0) > 0);
+
+        if (!attempts) {
+            buckets.fresh.push(question);
+        } else if (reviewState.isDue) {
+            buckets.due.push(question);
+        } else if (isWeak) {
+            buckets.weak.push(question);
+        } else {
+            buckets.reinforce.push(question);
+        }
+    });
+
+    var plan = [];
+    function appendUnique(items) {
+        items.forEach(function(question) {
+            if (plan.length >= count) return;
+            var key = normalizeAnswer(question.word);
+            var exists = plan.some(function(current) {
+                return normalizeAnswer(current.word) === key;
+            });
+            if (!exists) {
+                plan.push(question);
+            }
+        });
+    }
+
+    appendUnique(pickPriorityQuestionsEnhanced(buckets.due, Math.min(buckets.due.length, Math.max(4, Math.ceil(count * 0.45))), statsMap, wrongWordMap));
+    appendUnique(pickPriorityQuestionsEnhanced(buckets.weak, Math.min(buckets.weak.length, Math.ceil(count * 0.3)), statsMap, wrongWordMap));
+    appendUnique(pickPriorityQuestionsEnhanced(buckets.fresh, Math.min(buckets.fresh.length, Math.max(1, Math.floor(count * 0.15))), statsMap, wrongWordMap));
+    if (plan.length < count) appendUnique(pickPriorityQuestionsEnhanced(buckets.reinforce, count - plan.length, statsMap, wrongWordMap));
+    if (plan.length < count) appendUnique(pickPriorityQuestionsEnhanced(pool, count - plan.length, statsMap, wrongWordMap));
+    return plan.slice(0, count);
+}
+
+function getModePerformanceSummaryEnhanced(history) {
+    var trackedModes = ['listen', 'read', 'write', 'reverse', 'daily', 'review'];
+    var stats = {};
+
+    history.forEach(function(record) {
+        var mode = record.mode || 'unknown';
+        if (trackedModes.indexOf(mode) === -1) return;
+        if (!stats[mode]) {
+            stats[mode] = { count: 0, totalScore: 0 };
+        }
+        stats[mode].count += 1;
+        stats[mode].totalScore += record.score || 0;
+    });
+
+    return Object.keys(stats).map(function(mode) {
+        return {
+            mode: mode,
+            count: stats[mode].count,
+            average: Math.round(stats[mode].totalScore / stats[mode].count)
+        };
+    }).sort(function(a, b) {
+        return a.average - b.average || a.count - b.count;
+    })[0] || null;
+}
+
+function updateStudyFocusPanel() {
+    var grid = document.getElementById('studyFocusGrid');
+    var tip = document.getElementById('studyFocusTip');
+    var smartReviewBtn = document.getElementById('smartReviewBtn');
+    if (!grid || !tip || !smartReviewBtn) return;
+
+    if (!currentPlayerName) {
+        grid.innerHTML = '';
+        tip.textContent = '输入名字后自动生成今天的学习建议';
+        smartReviewBtn.textContent = '智能复习';
+        return;
+    }
+
+    var wordStats = Object.values(getWordStatsData());
+    var history = JSON.parse(localStorage.getItem(getStorageKey('history')) || '[]');
+    var reviewOverview = getReviewOverview(wordStats);
+    var weakCount = wordStats.filter(function(item) {
+        return (item.attempts || 0) > 0 && (getAdaptiveWordAccuracy(item) < 0.75 || (item.wrong || 0) >= 2 || (item.consecutiveWrong || 0) > 0);
+    }).length;
+    var weakestMode = getModePerformanceSummaryEnhanced(history);
+    var dailyEntry = getDailyChallengeData()[getTodayKey()];
+    var recommendedMode = weakestMode ? getModeDisplayName(weakestMode.mode) : '智能复习';
+    var goalText = reviewOverview.dueNow > 0 ? '先复习 ' + Math.min(reviewOverview.dueNow, totalQuestions) + ' 题' : (weakCount > 0 ? '巩固 ' + Math.min(weakCount, totalQuestions) + ' 个薄弱词' : '挑战一次每日任务');
+
+    grid.innerHTML = [
+        { label: '现在该复习', value: reviewOverview.dueNow, note: '到期优先' },
+        { label: '薄弱词汇', value: weakCount, note: '重点巩固' },
+        { label: '推荐模式', value: recommendedMode, note: '下一轮练它' },
+        { label: '今日目标', value: goalText, note: dailyEntry ? '今日最佳 ' + dailyEntry.bestScore + ' 分' : '保持节奏' }
+    ].map(function(card) {
+        return '<div class="study-focus-item"><div class="study-focus-label">' + escapeHtml(card.label) + '</div><div class="study-focus-value">' + escapeHtml(card.value) + '</div><div class="study-focus-note">' + escapeHtml(card.note) + '</div></div>';
+    }).join('');
+
+    tip.textContent = reviewOverview.dueNow > 0 ? '建议先做一轮智能复习，优先处理已经到期的词，再去挑战新题。' : (weakCount > 0 ? '到期词不多，适合先补薄弱词，再做每日挑战巩固手感。' : '当前节奏不错，适合继续做每日挑战或切换模式扩大覆盖面。');
+    smartReviewBtn.textContent = reviewOverview.dueNow > 0 ? '智能复习 (' + reviewOverview.dueNow + ')' : '智能复习';
+}
+
+var __originalShowMenuScreen = showMenuScreen;
+showMenuScreen = function() {
+    __originalShowMenuScreen();
+    updateStudyFocusPanel();
+};
+
+startSmartReview = function() {
+    var availableWords = getAllVocabulary();
+    if (availableWords.length < 4) {
+        alert('可用单词太少，请至少选择一个年级！');
+        return;
+    }
+    clearPendingAudio();
+    currentMode = 'review';
+    currentQuestionIndex = 0;
+    score = 0;
+    var questionCount = Math.min(totalQuestions, availableWords.length);
+    gameQuestions = buildSmartReviewQuestionsEnhanced(availableWords, questionCount);
+    showOnlyScreen('gameScreen');
+    document.getElementById('submitBtn').style.display = 'none';
+    clearSavedProgress();
+    displayQuestion();
+};
+
+var __originalLoadPlayerData = loadPlayerData;
+loadPlayerData = function(playerName) {
+    __originalLoadPlayerData(playerName);
+    updateStudyFocusPanel();
+    setTimeout(updateStudyFocusPanel, 1200);
+};
+
+var __originalShowMenu = showMenu;
+showMenu = function() {
+    __originalShowMenu();
+    updateStudyFocusPanel();
+};
+var ACCOUNT_STORAGE_KEY = 'englishGame_accounts';
+
+function getAccountsData() {
+    try {
+        return JSON.parse(localStorage.getItem(ACCOUNT_STORAGE_KEY) || '{}');
+    } catch (e) {
+        console.log('读取账号信息失败，使用空账号表', e);
+        return {};
+    }
+}
+
+function saveAccountsData(data) {
+    localStorage.setItem(ACCOUNT_STORAGE_KEY, JSON.stringify(data));
+}
+
+function getAccountLookupKey(name) {
+    return normalizeAnswer(name);
+}
+
+function getStoredAccount(name) {
+    return getAccountsData()[getAccountLookupKey(name)] || null;
+}
+
+function saveStoredAccount(name, account) {
+    var allAccounts = getAccountsData();
+    allAccounts[getAccountLookupKey(name)] = account;
+    saveAccountsData(allAccounts);
+}
+
+function showLoginMessage(text, type) {
+    var messageEl = document.getElementById('loginMessage');
+    if (!messageEl) return;
+    messageEl.textContent = text || '';
+    messageEl.className = 'login-message' + (type ? ' ' + type : '');
+}
+
+function setLoginBusy(isBusy) {
+    var button = document.getElementById('loginBtn');
+    if (!button) return;
+    button.disabled = isBusy;
+    button.textContent = isBusy ? '登录中...' : ' 登录 / 注册';
+}
+
+function clearLoginFormState() {
+    var nameInput = document.getElementById('playerNameInput');
+    var passwordInput = document.getElementById('playerPasswordInput');
+    if (nameInput) nameInput.style.borderColor = '#e0e0e0';
+    if (passwordInput) passwordInput.style.borderColor = '#e0e0e0';
+    showLoginMessage('');
+}
+
+function getPasswordHashFallback(raw) {
+    var hash = 2166136261;
+    for (var i = 0; i < raw.length; i++) {
+        hash ^= raw.charCodeAt(i);
+        hash += (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24);
+    }
+    return 'fallback-' + (hash >>> 0).toString(16);
+}
+
+async function hashPlayerPassword(name, password) {
+    var raw = 'english-game|' + getAccountLookupKey(name) + '|' + password;
+    if (window.crypto && window.crypto.subtle && window.TextEncoder) {
+        var bytes = new TextEncoder().encode(raw);
+        var digest = await window.crypto.subtle.digest('SHA-256', bytes);
+        return Array.from(new Uint8Array(digest)).map(function(byte) {
+            return byte.toString(16).padStart(2, '0');
+        }).join('');
+    }
+    return getPasswordHashFallback(raw);
+}
+
+async function fetchRemotePlayerRecord(name) {
+    if (!isFirebaseReady || !firebaseDB) return null;
+    try {
+        var snapshot = await firebaseDB.ref('players/' + name).once('value');
+        return snapshot.val();
+    } catch (err) {
+        console.log('读取云端账号失败，继续使用本地模式', err);
+        return null;
+    }
+}
+
+async function saveRemoteAccount(name, account) {
+    if (!isFirebaseReady || !firebaseDB) return;
+    try {
+        await firebaseDB.ref('players/' + name + '/auth').set(account);
+    } catch (err) {
+        console.log('保存云端账号失败，已保留本地账号', err);
+    }
+}
+
+function finishPlayerLogin(name) {
+    currentPlayerName = name;
+    localStorage.setItem('englishGameLastPlayer', name);
+    clearLoginFormState();
+    var passwordInput = document.getElementById('playerPasswordInput');
+    if (passwordInput) passwordInput.value = '';
+
+    showMenuScreen();
+    document.getElementById('playerInfo').style.display = 'flex';
+    document.getElementById('playerNameDisplay').textContent = ' ' + name;
+
+    loadPlayerData(name);
+    updateWrongWordsBtn();
+    loadCheckinData();
+}
+
+loginPlayer = async function() {
+    var nameInput = document.getElementById('playerNameInput');
+    var passwordInput = document.getElementById('playerPasswordInput');
+    var name = (nameInput.value || '').trim();
+    var password = (passwordInput.value || '').trim();
+
+    clearLoginFormState();
+
+    if (!name) {
+        nameInput.style.borderColor = '#f5576c';
+        showLoginMessage('请输入名字', 'error');
+        return;
+    }
+    if (!password) {
+        passwordInput.style.borderColor = '#f5576c';
+        showLoginMessage('请输入密码', 'error');
+        return;
+    }
+    if (password.length < 4) {
+        passwordInput.style.borderColor = '#f5576c';
+        showLoginMessage('密码至少 4 位', 'error');
+        return;
+    }
+
+    setLoginBusy(true);
+    try {
+        var remotePlayer = await fetchRemotePlayerRecord(name);
+        var remoteAccount = remotePlayer && remotePlayer.auth && remotePlayer.auth.passwordHash ? remotePlayer.auth : null;
+        var localAccount = getStoredAccount(name);
+        var passwordHash = await hashPlayerPassword(name, password);
+        var matchedAccount = localAccount || remoteAccount;
+        var isNewAccount = false;
+
+        if (matchedAccount && matchedAccount.passwordHash) {
+            if (matchedAccount.passwordHash !== passwordHash) {
+                passwordInput.style.borderColor = '#f5576c';
+                showLoginMessage('密码不正确，请重新输入', 'error');
+                return;
+            }
+            var mergedAccount = {
+                displayName: matchedAccount.displayName || name,
+                passwordHash: matchedAccount.passwordHash,
+                createdAt: matchedAccount.createdAt || Date.now(),
+                updatedAt: Date.now()
+            };
+            saveStoredAccount(name, mergedAccount);
+            if (!remoteAccount || remoteAccount.passwordHash !== mergedAccount.passwordHash) {
+                await saveRemoteAccount(name, mergedAccount);
+            }
+        } else {
+            isNewAccount = true;
+            var newAccount = {
+                displayName: name,
+                passwordHash: passwordHash,
+                createdAt: Date.now(),
+                updatedAt: Date.now()
+            };
+            saveStoredAccount(name, newAccount);
+            await saveRemoteAccount(name, newAccount);
+        }
+
+        finishPlayerLogin(name);
+        if (isNewAccount) {
+            showLoginMessage('新账号已创建', 'success');
+        }
+    } finally {
+        setLoginBusy(false);
+    }
+};
+
+var __originalSwitchPlayerAuth = switchPlayer;
+switchPlayer = function() {
+    __originalSwitchPlayerAuth();
+    var passwordInput = document.getElementById('playerPasswordInput');
+    if (passwordInput) {
+        passwordInput.value = '';
+        passwordInput.style.borderColor = '#e0e0e0';
+    }
+    clearLoginFormState();
+};
+
+document.addEventListener('DOMContentLoaded', function() {
+    var passwordInput = document.getElementById('playerPasswordInput');
+    if (passwordInput) {
+        passwordInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') loginPlayer();
+        });
+    }
+});
